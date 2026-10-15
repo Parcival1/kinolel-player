@@ -13,3 +13,24 @@ QString Names::HelperName()
 {
   return QString("@HELPER_NAME@");
 }
+
+// KinoLel: Werte aus marke.cmake
+QString Names::AppName()
+{
+  return QString::fromUtf8("@APP_NAME@");
+}
+
+QString Names::AppId()
+{
+  return QString("@APP_ID@");
+}
+
+QString Names::ServerUrl()
+{
+  return QString("@APP_SERVER_URL@");
+}
+
+QString Names::AppUrl()
+{
+  return QString("@APP_URL@");
+}

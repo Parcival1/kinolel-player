@@ -433,7 +433,9 @@ QString SystemComponent::getUserAgent()
   QString kernel = QSysInfo::kernelType();
   kernel[0] = kernel[0].toUpper();
   QString chromeVersion = QString(qWebEngineChromiumVersion()).split('.').first() + ".0.0.0";
-  QString userAgent = QString("JellyfinDesktop/%1 (%2; %3) Chrome/%4")
+  // KinoLel: eigene Kennung statt "JellyfinDesktop"
+  QString userAgent = QString("%1/%2 (%3; %4) Chrome/%5")
+    .arg(Names::AppId())
     .arg(Version::GetVersionString())
     .arg(kernel)
     .arg(getPlatformArchString())
@@ -447,7 +449,7 @@ QString SystemComponent::debugInformation()
   QString debugInfo;
   QTextStream stream(&debugInfo);
 
-  stream << "Jellyfin\n";
+  stream << Names::AppName() << "\n";
   stream << "  Version: " << Version::GetVersionString() << " built: " << Version::GetBuildDate() << "\n";
   stream << "  Web Client Version: " << Version::GetWebVersion() << "\n";
   stream << "  Web Client URL: " << SettingsComponent::Get().value(SETTINGS_SECTION_PATH, "startupurl").toString() << "\n";
@@ -554,6 +556,9 @@ QString SystemComponent::getNativeShellScript()
   clientData.insert("version", QJsonValue::fromVariant(Version::GetVersionString()));
   clientData.insert("userAgent", QJsonValue::fromVariant(getUserAgent()));
   clientData.insert("scriptPath", QJsonValue::fromVariant("file:///" + path));
+  // KinoLel: Name und fester Server aus marke.cmake
+  clientData.insert("appName", QJsonValue::fromVariant(Names::AppName()));
+  clientData.insert("serverUrl", QJsonValue::fromVariant(Names::ServerUrl()));
   QString defaultMode = SettingsComponent::Get().value(SETTINGS_SECTION_MAIN, "layout").toString();
 
   QFile flatpakOsFile {"/run/host/os-release"};

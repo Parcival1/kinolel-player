@@ -12,6 +12,7 @@
 #include <QCommandLineOption>
 #include <QDebug>
 #include <QSettings>
+#include <QUrl>
 
 #include "shared/Names.h"
 #include "system/SystemComponent.h"
@@ -88,7 +89,7 @@ static void preinitQt()
 {
   QCoreApplication::setApplicationName(Names::DataName());
   QCoreApplication::setApplicationVersion(Version::GetVersionString());
-  QCoreApplication::setOrganizationDomain("jellyfin.org");
+  QCoreApplication::setOrganizationDomain(QUrl(Names::AppUrl()).host());
 
 #ifdef Q_OS_WIN32
   // Qt 6 uses desktop OpenGL by default on Windows
@@ -141,7 +142,7 @@ int main(int argc, char *argv[])
   try
   {
     QCommandLineParser parser;
-    parser.setApplicationDescription("Jellyfin Desktop");
+    parser.setApplicationDescription(Names::AppName());
     parser.addVersionOption();
     parser.addOptions({{{"h", "help"},              "Show this help"},
                        {{"l", "licenses"},          "Show license information"},
@@ -440,6 +441,8 @@ int main(int argc, char *argv[])
 
     QtWebEngineQuick::initialize();
     QApplication app(newArgc, newArgv);
+    // KinoLel: Anzeigename (Fenstertitel, Infobereich) aus marke.cmake
+    QGuiApplication::setApplicationDisplayName(Names::AppName());
 
 #if defined(Q_OS_WIN) 
     // Setting window icon on OSX will break user ability to change it

@@ -1,198 +1,88 @@
-async function tryConnect(server) {
+// KinoLel: feste Server-Adresse statt Serverauswahl.
+// Die Adresse kommt aus marke.cmake (C++ -> jmpInfo.serverUrl). Die Verbindungsprüfung läuft in C++ und
+// wiederholt sich von selbst, bis der Server antwortet; danach geht es direkt zur Anmeldeseite von KinoLel.
+
+const FALLBACK_SERVER = 'https://kinolel.de';
+
+// Name aus marke.cmake; die Texte kommen ohne ungarische Endungen am Namen aus (Name kann sich ändern)
+const NAME = (window.jmpInfo && window.jmpInfo.appName) || 'KinoLel';
+
+const TEXTE = {
+    de: {
+        verbinde: `Verbindung zu ${NAME} wird hergestellt …`,
+        weg: `${NAME} ist gerade nicht erreichbar.<br>Bitte Internetverbindung prüfen – es wird weiter versucht.`,
+        nochmal: 'Erneut versuchen'
+    },
+    hu: {
+        verbinde: `${NAME} – kapcsolódás …`,
+        weg: `${NAME} most nem érhető el.<br>Kérjük, ellenőrizd az internetkapcsolatot – tovább próbálkozunk.`,
+        nochmal: 'Újra'
+    }
+};
+
+const sprache = (navigator.language || 'de').slice(0, 2).toLowerCase() === 'hu' ? 'hu' : 'de';
+const T = TEXTE[sprache];
+document.documentElement.lang = sprache;
+document.title = NAME;
+document.getElementById('container').setAttribute('aria-label', NAME);
+document.querySelector('.name').alt = NAME;
+
+const statusEl = document.getElementById('status');
+const knopf = document.getElementById('nochmal');
+knopf.textContent = T.nochmal;
+
+let hinweisTimer = null;
+let fehlerTimer = null;
+
+function zeigeStatus(html) {
+    statusEl.innerHTML = html;
+    statusEl.classList.add('sichtbar');
+}
+
+function serverAdresse() {
+    const info = window.jmpInfo || {};
+    return info.serverUrl || FALLBACK_SERVER;
+}
+
+async function verbinden() {
+    const server = serverAdresse();
+    clearTimeout(hinweisTimer);
+    clearTimeout(fehlerTimer);
+    knopf.hidden = true;
+    statusEl.classList.remove('sichtbar');
+
+    // Hinweise nur, wenn es länger dauert (normal ist es nach < 1 s weg)
+    hinweisTimer = setTimeout(() => zeigeStatus(T.verbinde), 3000);
+    fehlerTimer = setTimeout(() => {
+        zeigeStatus(T.weg);
+        knopf.hidden = false;
+    }, 15000);
+
     try {
-        if (!server.startsWith("http")) {
-            server = "http://" + server;
-        }
-
-        console.log("Checking connectivity to:", server);
-
-        const resolvedUrl = await window.jmpCheckServerConnectivity(server);
-        console.log("Server connectivity check passed");
-        console.log("Resolved URL:", resolvedUrl);
-
-        // Save original URL but navigate to fully-resolved redirect
+        console.log('KinoLel: verbinde mit', server);
+        const ziel = await window.jmpCheckServerConnectivity(server);
+        clearTimeout(hinweisTimer);
+        clearTimeout(fehlerTimer);
+        // Merken (wird von Jellyfin Desktop intern genutzt), dann direkt zur Anmeldung/Startseite
         window.jmpInfo.settings.main.userWebClient = server;
-
-        // Navigation will clean up handlers, but do it explicitly
-        window.location = resolvedUrl;
-
-        return true;
+        window.location = ziel;
     } catch (e) {
-        console.error("Server connectivity check failed:", e);
-        return false;
+        // Nur bei Abbruch (Knopf "Erneut versuchen") oder fehlendem WebChannel
+        console.warn('KinoLel: Verbindung unterbrochen:', e);
     }
 }
 
-let isConnecting = false;
-
-const updateButtonState = () => {
-    const address = document.getElementById('address');
-    const button = document.getElementById('connect-button');
-    const hasValue = address.value.trim().length > 0;
-
-    if (!isConnecting) {
-        button.disabled = !hasValue;
+knopf.addEventListener('click', () => {
+    if (window.jmpCheckServerConnectivity && window.jmpCheckServerConnectivity.abort) {
+        window.jmpCheckServerConnectivity.abort();
     }
-};
-
-const cancelOnEscape = (e) => {
-    if (isConnecting && e.key === 'Escape') {
-        cancelConnection();
-    }
-};
-
-const startConnecting = async () => {
-    const address = document.getElementById('address');
-    const title = document.getElementById('title');
-    const spinner = document.getElementById('spinner');
-    const button = document.getElementById('connect-button');
-    const server = address.value;
-
-    isConnecting = true;
-    title.textContent = '';
-    title.style.visibility = 'hidden';
-    address.classList.add('connecting');
-    address.style.visibility = 'hidden';
-    address.disabled = true;
-    spinner.style.display = 'block';
-    button.style.visibility = 'hidden';
-    document.addEventListener('keydown', cancelOnEscape);
-
-    // C++ handles retries, just wait for result
-    const connected = await tryConnect(server);
-
-    if (!connected) {
-        isConnecting = false;
-        title.textContent = document.getElementById('title').getAttribute('data-original-text');
-        title.style.visibility = 'visible';
-        address.classList.remove('connecting');
-        address.style.visibility = 'visible';
-        address.disabled = false;
-        spinner.style.display = 'none';
-        button.style.visibility = 'visible';
-        document.removeEventListener('keydown', cancelOnEscape);
-        updateButtonState();
-    }
-};
-
-const cancelConnection = () => {
-    if (!isConnecting) return;
-
-    console.log("Cancelling connection");
-    isConnecting = false;
-
-    // Cancel C++ connectivity check and abort JS promise
     if (window.api && window.api.system) {
         window.api.system.cancelServerConnectivity();
     }
-    if (window.jmpCheckServerConnectivity.abort) {
-        window.jmpCheckServerConnectivity.abort();
-    }
-
-    const address = document.getElementById('address');
-    const title = document.getElementById('title');
-    const spinner = document.getElementById('spinner');
-    const button = document.getElementById('connect-button');
-
-    title.textContent = document.getElementById('title').getAttribute('data-original-text');
-    title.style.visibility = 'visible';
-    address.classList.remove('connecting');
-    address.style.visibility = 'visible';
-    address.disabled = false;
-    spinner.style.display = 'none';
-    button.style.visibility = 'visible';
-    document.removeEventListener('keydown', cancelOnEscape);
-    updateButtonState();
-};
-
-// Button click handler
-document.getElementById('connect-button').addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!e.target.disabled) {
-        startConnecting();
-    }
+    setTimeout(verbinden, 100);
 });
 
-// Form submit handler
-document.getElementById('connect-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (!isConnecting) {
-        startConnecting();
-    }
-});
-
-// Input change handler
-document.getElementById('address').addEventListener('input', updateButtonState);
-
-
-// Enter key handler
-document.addEventListener('keydown', (e) => {
-    const address = document.getElementById('address');
-    if (e.key === 'Enter' && !isConnecting && !address.disabled && address.value.trim()) {
-        e.preventDefault();
-        startConnecting();
-    }
-});
-
-// Auto-connect on load
 (async () => {
-    console.log('Auto-connect: starting');
-
     await window.apiPromise;
-
-    const savedServer = window.jmpInfo.settings.main.userWebClient;
-    console.log('Auto-connect: savedServer =', savedServer);
-
-    if (savedServer) {
-        console.log('Auto-connect: checking saved server', savedServer);
-
-        const address = document.getElementById('address');
-        const title = document.getElementById('title');
-        const spinner = document.getElementById('spinner');
-        const button = document.getElementById('connect-button');
-
-        // Set address value for potential display later
-        address.value = savedServer;
-
-        // Show connecting UI
-        isConnecting = true;
-        title.textContent = '';
-        title.style.visibility = 'hidden';
-        address.classList.add('connecting');
-        address.style.visibility = 'hidden';
-        address.disabled = true;
-        spinner.style.display = 'block';
-        button.style.visibility = 'hidden';
-        document.addEventListener('keydown', cancelOnEscape);
-
-        // C++ handles retries, just wait for result
-        const connected = await tryConnect(savedServer);
-
-        if (!connected) {
-            // User cancelled or error - show UI
-            isConnecting = false;
-            title.textContent = document.getElementById('title').getAttribute('data-original-text');
-            title.style.visibility = 'visible';
-            address.classList.remove('connecting');
-            address.style.visibility = 'visible';
-            address.disabled = false;
-            spinner.style.display = 'none';
-            button.style.visibility = 'visible';
-            document.removeEventListener('keydown', cancelOnEscape);
-            address.focus();
-            updateButtonState();
-        }
-    } else {
-        const title = document.getElementById('title');
-        const address = document.getElementById('address');
-        const button = document.getElementById('connect-button');
-
-        title.style.visibility = 'visible';
-        address.style.visibility = 'visible';
-        button.style.visibility = 'visible';
-        address.focus();
-        updateButtonState();
-    }
+    verbinden();
 })();

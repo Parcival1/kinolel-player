@@ -9,18 +9,19 @@
 #include "system/SystemComponent.h"
 #include "settings/SettingsComponent.h"
 #include "ErrorMessage.h"
+#include "shared/Names.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ErrorMessage::ErrorMessage(const QString& errorMessage, bool allowResetConfig)
   : QMessageBox(nullptr)
 {
   setIcon(Critical);
-  setText("Jellyfin Desktop encountered a fatal error and must exit");
+  // KinoLel: Texte Deutsch, Name aus marke.cmake
+  setText(Names::AppName() + QString::fromUtf8(" hat einen schweren Fehler und muss beendet werden."));
   setDetailedText(errorMessage);
-  setInformativeText("Press help below to be redirected to our friendly support forums." \
-                     "Press reset to reset configuration to the default and try again." \
-                     "Press abort to exit.");
-  setWindowTitle("Jellyfin Desktop Fatal Error!");
+  setInformativeText(QString::fromUtf8("„Zurücksetzen“ stellt die Einstellungen des Players zurück und startet neu. "
+                                       "„Abbrechen“ beendet das Programm."));
+  setWindowTitle(Names::AppName() + " – Fehler");
 
   auto exitButton = addButton(Abort);
   auto helpButton = addButton(Help);
@@ -42,7 +43,7 @@ ErrorMessage::ErrorMessage(const QString& errorMessage, bool allowResetConfig)
     }
     else if (button == helpButton)
     {
-      QDesktopServices::openUrl(QUrl("https://jellyfin.org"));
+      QDesktopServices::openUrl(QUrl(Names::AppUrl()));
     }
   });
 }

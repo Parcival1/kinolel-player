@@ -1,3 +1,8 @@
+# KinoLel: Quelltexte sind UTF-8 (deutsche/ungarische Texte)
+if(MSVC)
+  add_compile_options(/utf-8)
+endif()
+
 # MSVC goes totally bananas if we pass it -Wall
 if(NOT MSVC)
   enable_if_supported(COMPILER_FLAGS "-Wall")

@@ -7,6 +7,11 @@ option(UPGRADE_DEBUG "" OFF)
 file(READ "${CMAKE_SOURCE_DIR}/VERSION" VERSION_STRING)
 string(STRIP "${VERSION_STRING}" VERSION_STRING)
 
+# KinoLel: eigene Versionsnummer aus marke.cmake; die Jellyfin-Desktop-Basis bleibt in VERSION
+include(${CMAKE_SOURCE_DIR}/marke.cmake)
+set(UPSTREAM_VERSION_STRING "${VERSION_STRING}")
+set(VERSION_STRING "${APP_VERSION}")
+
 # Extract major.minor.patch for places that need it
 string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" VERSION_BASE "${VERSION_STRING}")
 if(NOT VERSION_BASE)

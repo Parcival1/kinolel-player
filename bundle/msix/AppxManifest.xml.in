@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- KinoLel-Player: MSIX-Manifest (Microsoft Store). Platzhalter @…@ füllt bundle/msix/msix-bauen.ps1 aus marke.cmake. -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap10 rescap">
+
+  <Identity Name="@STORE_IDENTITY_NAME@" Publisher="@STORE_PUBLISHER@" Version="@MSIX_VERSION@" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>@APP_NAME@</DisplayName>
+    <PublisherDisplayName>@STORE_PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>@APP_DESCRIPTION@</Description>
+  </Properties>
+
+  <Dependencies>
+    <!-- Windows 10 2004 (19041) oder neuer; uap10:Parameters braucht 19041 -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="de-DE" />
+    <Resource Language="hu-HU" />
+  </Resources>
+
+  <Applications>
+    <!-- Normal: Fenster, Desktop-Oberfläche -->
+    <Application Id="App" Executable="@APP_EXE@" EntryPoint="Windows.FullTrustApplication" uap10:Parameters="--desktop --windowed">
+      <uap:VisualElements DisplayName="@APP_NAME@" Description="@APP_DESCRIPTION@" BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="@APP_COLOR_BACKGROUND@" />
+      </uap:VisualElements>
+    </Application>
+    <!-- TV-Modus: Vollbild, TV-Oberfläche (Fernbedienung/Gamepad) -->
+    <Application Id="TV" Executable="@APP_EXE@" EntryPoint="Windows.FullTrustApplication" uap10:Parameters="--tv --fullscreen">
+      <uap:VisualElements DisplayName="@APP_NAME@ (TV)" Description="@APP_DESCRIPTION@" BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="@APP_COLOR_BACKGROUND@" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

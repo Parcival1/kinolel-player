@@ -1,4 +1,10 @@
-name: build-windows
+# KinoLel-Player: Windows-Build (abgeleitet von jellyfin-desktop build-windows.yml)
+#
+# Läuft bei jedem Push auf main und von Hand (Actions -> windows -> Run workflow).
+# Ergebnis (Actions-Lauf -> Artifacts): Installer (.exe), Portable (.zip), MSIX (Store + Test).
+# Ein Tag "v*" (z. B. v0.1.0) erstellt zusätzlich eine öffentliche Vorab-Version unter "Releases"
+# mit direktem Download-Link – so kann die Familie ohne GitHub-Anmeldung herunterladen.
+name: windows
 
 env:
   MPV_VERSION: "20251214-git-f7be2ee"
@@ -7,11 +13,15 @@ env:
   QT_VERSION: "6.9.3"
 
 on:
-  workflow_call:
   workflow_dispatch:
   push:
     branches:
-      - master
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -26,14 +36,6 @@ jobs:
             vc_redist_arch: x64
             vcvars: vcvars64.bat
             machine: X64
-          # ARM64 disabled - requires qt webengine builds
-          # - artifact: windows-arm64
-          #   qt_arch: win64_msvc2022_arm64
-          #   mpv_arch: aarch64
-          #   mpv_arch_fallback: ""
-          #   vc_redist_arch: arm64
-          #   vcvars: vcvarsamd64_arm64.bat
-          #   machine: ARM64
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v7
@@ -100,18 +102,42 @@ jobs:
         cd build
         set PATH=%PATH%;C:\Program Files (x86)\Inno Setup 6;%CD%
         set "QT_ROOT_DIR=%QT_ROOT_DIR:\=/%"
-        cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=output -DQTROOT=%QT_ROOT_DIR% -DMPV_INCLUDE_DIR=mpv/include -DMPV_LIBRARY=mpv/libmpv-2.dll -DCHECK_FOR_UPDATES=ON -DUSE_STATIC_MPVQT=ON ..
-        lib /def:mpv\mpv.def /out:mpv\libmpv-2.dll.lib /MACHINE:${{ matrix.machine }}
-        ninja
-        ninja windows_all
+        rem KinoLel: ohne CHECK_FOR_UPDATES (die Jellyfin-Desktop-Updateprüfung passt nicht zu KinoLel)
+        cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=output -DQTROOT=%QT_ROOT_DIR% -DMPV_INCLUDE_DIR=mpv/include -DMPV_LIBRARY=mpv/libmpv-2.dll -DUSE_STATIC_MPVQT=ON .. || exit /b 1
+        lib /def:mpv\mpv.def /out:mpv\libmpv-2.dll.lib /MACHINE:${{ matrix.machine }} || exit /b 1
+        ninja || exit /b 1
+        ninja windows_all || exit /b 1
       shell: cmd
+    - name: MSIX-Paket (Store vorbereitet + Test)
+      # Noch nicht kritisch: schlägt das fehl, gibt es trotzdem Installer und Portable
+      continue-on-error: true
+      run: ./bundle/msix/msix-bauen.ps1 -Quelle build/portable -Ziel build
+      shell: pwsh
     - name: Archive installer
       uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.artifact }}-installer
-        path: ${{ github.workspace }}/build/JellyfinDesktop-*.exe
+        path: ${{ github.workspace }}/build/*-Setup-*.exe
+        if-no-files-found: error
     - name: Archive portable ZIP
       uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.artifact }}-portable
-        path: ${{ github.workspace }}/build/JellyfinDesktop-*.zip
+        path: ${{ github.workspace }}/build/*-Portable-*.zip
+        if-no-files-found: error
+    - name: Archive MSIX
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ matrix.artifact }}-msix
+        path: |
+          ${{ github.workspace }}/build/*.msix
+          ${{ github.workspace }}/build/*.cer
+        if-no-files-found: warn
+    - name: Vorab-Version veröffentlichen (nur bei Tag v*)
+      if: startsWith(github.ref, 'refs/tags/v')
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        $dateien = @(Get-ChildItem build -File | Where-Object { $_.Name -match '-Setup-.*\.exe$|-Portable-.*\.zip$|\.msix$|\.cer$' } | ForEach-Object { $_.FullName })
+        gh release create "${{ github.ref_name }}" $dateien --prerelease --title "Testversion ${{ github.ref_name }}" --notes-file TESTANLEITUNG.md
+      shell: pwsh

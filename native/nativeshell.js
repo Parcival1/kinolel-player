@@ -5,7 +5,7 @@ const features = [
     "htmlvideoautoplay",
     "externallinks",
     "clientsettings",
-    "multiserver",
+    // KinoLel: kein "multiserver" – fester Server, keine Serverauswahl
     "exitmenu",
     "remotecontrol",
     "fullscreenchange",
@@ -167,7 +167,7 @@ function getDeviceProfile() {
     }
 
     return {
-        'Name': 'Jellyfin Desktop',
+        'Name': jmpInfo.appName || 'Jellyfin Desktop',
         'MaxStaticBitrate': 1000000000,
         'MusicStreamingTranscodingBitrate': 1280000,
         'TimelineOffsetSeconds': 5,
@@ -316,7 +316,7 @@ window.NativeShell.AppHost = {
     init() {
         return Promise.resolve({
             deviceName: jmpInfo.deviceName,
-            appName: "Jellyfin Desktop",
+            appName: jmpInfo.appName || "Jellyfin Desktop",
             appVersion: jmpInfo.version
         });
     },
@@ -329,7 +329,7 @@ window.NativeShell.AppHost = {
     getDeviceProfile,
     getSyncProfile: getDeviceProfile,
     appName() {
-        return "Jellyfin Desktop";
+        return jmpInfo.appName || "Jellyfin Desktop";
     },
     appVersion() {
         return jmpInfo.version;
@@ -528,7 +528,7 @@ async function showSettingsModal() {
     jmpInfo.settingsDescriptionsUpdate.push(onSectionUpdate);
     jmpInfo.settingsUpdate.push(onSectionUpdate);
 
-    if (jmpInfo.settings.main.userWebClient) {
+    if (jmpInfo.settings.main.userWebClient && !jmpInfo.serverUrl) {  // KinoLel: fester Server -> kein Zuruecksetzen
         const group = document.createElement("fieldset");
         group.className = "editItemMetadataForm editMetadataForm dialog-content-centered";
         group.style.border = 0;

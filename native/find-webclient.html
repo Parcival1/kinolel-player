@@ -2,19 +2,21 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Jellyfin</title>
+    <title>KinoLel</title>
     <link rel="stylesheet" href="find-webclient.css">
 </head>
 <body>
-    <div id="container">
-        <img class="logo" src="logo.png">
-        <form id="connect-form">
-            <h1 id="title"></h1>
-            <div id="spinner"></div>
-            <input type="text" id="address" autofocus>
-            <button id="connect-button" type="submit"></button>
-        </form>
+    <!-- KinoLel: Startbild mit Ladekreis (wie das Lade-Overlay auf kinolel.de). Der Server ist fest
+         (marke.cmake -> jmpInfo.serverUrl); es gibt keine Serverauswahl. -->
+    <div id="container" role="progressbar" aria-label="KinoLel">
+        <div class="kreis">
+            <svg class="ring" viewBox="0 0 176 176" aria-hidden="true"><circle cx="88" cy="88" r="80" fill="none" stroke="rgba(154,164,255,.14)" stroke-width="5"/><circle cx="88" cy="88" r="80" fill="none" stroke="#9aa4ff" stroke-width="5" stroke-linecap="round" stroke-dasharray="135 368"/></svg>
+            <svg class="logo" viewBox="0 0 677 433" aria-hidden="true"><path fill="#fff" fill-rule="evenodd" d="M22,0H655A22,22 0 0 1 677,22V411A22,22 0 0 1 655,433H22A22,22 0 0 1 0,411V22A22,22 0 0 1 22,0ZM64,45H613A14,14 0 0 1 627,59V374A14,14 0 0 1 613,388H64A14,14 0 0 1 50,374V59A14,14 0 0 1 64,45ZM241,216A97,97 0 1 0 435,216A97,97 0 1 0 241,216ZM308,156L401,216L308,279Z"/></svg>
+            <img class="name" alt="KinoLel" src="schriftzug.png">
+        </div>
+        <p id="status" aria-live="polite"></p>
+        <button id="nochmal" type="button" hidden></button>
     </div>
-    <script src="find-webclient.lang.js"></script>
     <script src="find-webclient.js"></script>
+</body>
 </html>

@@ -11,6 +11,11 @@ namespace Names
 {
   QString DataName();
   QString HelperName();
+  // KinoLel: Werte aus marke.cmake
+  QString AppName();
+  QString AppId();
+  QString ServerUrl();
+  QString AppUrl();
 };
 
 #endif //NAMES_H

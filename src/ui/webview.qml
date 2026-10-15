@@ -9,7 +9,7 @@ import Qt.labs.platform as Labs
 Window
 {
   id: mainWindow
-  title: "Jellyfin Desktop"
+  title: Qt.application.displayName  // KinoLel: Name aus marke.cmake
   objectName: "mainWindow"
   width: 1280
   height: 720
@@ -296,10 +296,13 @@ Window
       {
         console.log("WebEngineLoadRequest failure: " + loadingInfo.url + " error code: " + loadingInfo.errorCode);
         errorLabel.visible = true
-        errorLabel.text = "Error loading client, this is bad and should not happen<br>" +
-                          "You can try to <a href='reload'>reload</a> or head to our <a href='http://jellyfin.org'>support page</a><br><br>Actual Error: <pre>" +
-                          loadingInfo.errorString + " [" + loadingInfo.errorCode + "]</pre><br><br>" +
-                          "Provide the <a target='_blank' href='file://"+ components.system.logFilePath + "'>logfile</a> as well."
+        // KinoLel: Fehlermeldung Deutsch/Ungarisch
+        var hu = Qt.locale().name.indexOf("hu") === 0
+        var name = Qt.application.displayName
+        errorLabel.text = (hu ? name + " most nem érhető el.<br><a href='reload'>Újra</a>"
+                              : name + " ist gerade nicht erreichbar.<br><a href='reload'>Erneut versuchen</a>") +
+                          "<br><br><pre>" + loadingInfo.errorString + " [" + loadingInfo.errorCode + "]</pre>" +
+                          "<a target='_blank' href='file://"+ components.system.logFilePath + "'>Log</a>"
       }
     }
 
@@ -339,7 +342,7 @@ Window
     z: 5
     anchors.centerIn: parent
     color: "#999999"
-    linkColor: "#a85dc3"
+    linkColor: "#9aa4ff"
     text: "Generic error"
     font.pixelSize: 32
     font.bold: true
@@ -422,7 +425,7 @@ Window
   Labs.SystemTrayIcon {
     visible: showSystemTrayIcon
     icon.source: "qrc:/images/icon.png"
-    tooltip: "Jellyfin Desktop"
+    tooltip: Qt.application.displayName
 
     onActivated: function(reason) {
       if (reason === Labs.SystemTrayIcon.Context) {

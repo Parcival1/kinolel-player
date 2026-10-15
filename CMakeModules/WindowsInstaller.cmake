@@ -37,7 +37,8 @@ else()
   set(INSTALLER_ARCH_STR x86)
 endif()
 
-set(INSTALLER_BASE_NAME "JellyfinDesktop-${VERSION_STRING}-${INSTALLER_ARCH_STR}")
+# KinoLel: Dateinamen aus marke.cmake, z. B. KinoLel-Setup-0.1.0-x64.exe / KinoLel-Portable-0.1.0-x64.zip
+set(INSTALLER_BASE_NAME "${APP_NAME}-Setup-${VERSION_STRING}-${INSTALLER_ARCH_STR}")
 set(INSTALLER_OUTPUT_NAME "${INSTALLER_BASE_NAME}.exe")
 
 # Create the installer using Inno Setup
@@ -61,7 +62,7 @@ add_custom_target(JellyfinDesktopInstaller
 add_custom_target(windows_package DEPENDS JellyfinDesktopInstaller)
 
 # Create portable ZIP archive (includes bundled runtime DLLs in root)
-set(ZIP_OUTPUT_NAME "${INSTALLER_BASE_NAME}.zip")
+set(ZIP_OUTPUT_NAME "${APP_NAME}-Portable-${VERSION_STRING}-${INSTALLER_ARCH_STR}.zip")
 set(ZIP_STAGING_DIR "${CMAKE_CURRENT_BINARY_DIR}/portable")
 
 # Configure the prepare script
