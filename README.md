@@ -45,16 +45,12 @@ Bauen von Hand unter Windows: siehe [dev/windows/README.md](dev/windows/README.m
 Qt 6.9.3 mit WebEngine, libmpv). Kette: MSVC 2022 x64 → Qt 6.9.3 (`qtwebengine qtwebchannel qtpositioning`) →
 libmpv (shinchiro-Build) → MpvQt (Submodul `external/mpvqt`, statisch) → Inno Setup 6 → Windows SDK (`makeappx`).
 
-## Name ändern
+## Name und Bilder
 
-1. In `marke.cmake` `APP_NAME` ändern (ggf. `APP_DESCRIPTION`).
-2. Bilder neu erzeugen (braucht Pillow):
-   `python3 marke/bilder_erzeugen.py . --schrift /pfad/InterDisplay-Bold.otf`
-   (für „KinoLel“ stattdessen `--banner banner-light.png` von kinolel.de – dann wird der Original-Schriftzug genommen).
-3. Committen und pushen – Installer, Startmenü, Fenstertitel, MSIX und die Anzeige im Jellyfin-Dashboard folgen.
-
-`APP_NAME` ist auch der Datenordner (`%LOCALAPPDATA%\<Name>`): nach der ersten Verteilung nicht mehr ändern,
-sonst müssen sich alle neu anmelden. `APP_INSTALLER_GUID` nie ändern.
+Der Name ist endgültig **KinoLel** (Lel, 15.10.2026); Logo und Schriftzug wie auf kinolel.de.
+Bilder neu erzeugen (z. B. nach Logo-Änderung, braucht Pillow):
+`python3 marke/bilder_erzeugen.py . --banner banner-light.png` (Banner von kinolel.de).
+`APP_NAME` (= Datenordner) und `APP_INSTALLER_GUID` nicht ändern.
 
 ## Neue Jellyfin-Desktop-Versionen übernehmen
 

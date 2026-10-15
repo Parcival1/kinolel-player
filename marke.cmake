@@ -1,12 +1,9 @@
 # =====================================================================================================
 #  KinoLel-Player – Marke. EINZIGE Stelle für Name, Server, Version und Store-Daten.
 #
-#  Name ändern (z. B. FilmLel, CineLel, MoziKino): nur APP_NAME hier anpassen und die Bilder neu
-#  erzeugen (marke/README.md). Alles andere – Fenstertitel, Programmdatei, Startmenü, Installer,
-#  MSIX-Paket, Anzeige im Jellyfin-Dashboard – wird beim Bauen daraus abgeleitet.
-#
-#  Achtung: APP_NAME ist auch der Datenordner (%LOCALAPPDATA%\<APP_NAME>). Nach der ersten Verteilung
-#  an die Familie den Namen nicht mehr ändern, sonst müssen sich alle neu anmelden.
+#  Der Name ist endgültig „KinoLel“ (Lel, 15.10.2026). Fenstertitel, Programmdatei, Startmenü, Installer,
+#  MSIX-Paket und die Anzeige im Jellyfin-Dashboard werden beim Bauen aus APP_NAME abgeleitet.
+#  APP_NAME ist auch der Datenordner (%LOCALAPPDATA%\KinoLel) – nicht ändern.
 # =====================================================================================================
 
 # Anzeigename (Fenster, Startmenü, Programmdatei <APP_NAME>.exe, Datenordner, Client-Name in Jellyfin)
