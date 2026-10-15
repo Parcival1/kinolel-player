@@ -55,7 +55,7 @@ body {
     transform: translateX(-50%);
 }
 #status {
-    min-height: 3em;
+    min-height: 4.5em;
     max-width: 30em;
     margin: 2em 0 0;
     text-align: center;
@@ -77,6 +77,11 @@ body {
     font-weight: 600;
     padding: 0.7em 1.6em;
     cursor: pointer;
+}
+/* Platz für Hinweis und Knopf von Anfang an freihalten, damit das Logo nicht springt */
+#nochmal[hidden] {
+    display: inline-block;
+    visibility: hidden;
 }
 #nochmal:hover,
 #nochmal:focus-visible {
