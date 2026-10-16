@@ -35,6 +35,8 @@ public:
   void componentPostInitialize() override;
 
   Q_INVOKABLE QVariantMap systemInformation() const;
+  // KinoLel: Grafik-Diagnose (OpenGL-Treiber, Software-Rendering, Render-Schleife) für Log und Strg+Umschalt+G
+  Q_INVOKABLE QString grafikInfo() const;
   Q_INVOKABLE void exit();
   Q_INVOKABLE static void restart();
 

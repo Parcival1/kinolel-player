@@ -22,6 +22,10 @@
 #include <functional>
 
 #include <QtWebEngineCore/qtwebenginecoreglobal.h>
+#include <QOffscreenSurface>
+#include <QOpenGLContext>
+#include <QOpenGLFunctions>
+#include <QScreen>
 
 #include "input/InputComponent.h"
 #include "SystemComponent.h"
@@ -33,6 +37,7 @@
 #include "Names.h"
 #include "utils/Utils.h"
 #include "utils/Log.h"
+#include "core/Globals.h"
 
 
 #define KONVERGO_PRODUCTID_DEFAULT  3
@@ -425,6 +430,54 @@ void SystemComponent::cancelServerConnectivity()
   }
 
   m_pendingConnectivityUrl.clear();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// KinoLel: Welche Grafik nutzt die App? Wichtig bei Ruckeln/hoher Last: Software-OpenGL (z. B. VM ohne GPU)
+// rendert alles auf der CPU, Qt nutzt dann außerdem die einfache Render-Schleife im GUI-Thread.
+QString SystemComponent::grafikInfo() const
+{
+  QStringList zeilen;
+  QString hersteller, renderer, version;
+  QOpenGLContext* gemeinsam = QOpenGLContext::globalShareContext();
+  if (gemeinsam)
+  {
+    QOffscreenSurface flaeche;
+    flaeche.setFormat(gemeinsam->format());
+    flaeche.create();
+    QOpenGLContext kontext;
+    kontext.setShareContext(gemeinsam);
+    kontext.setFormat(gemeinsam->format());
+    if (kontext.create() && kontext.makeCurrent(&flaeche))
+    {
+      QOpenGLFunctions* f = kontext.functions();
+      auto text = [f](GLenum name) {
+        const GLubyte* wert = f->glGetString(name);
+        return wert ? QString::fromLatin1(reinterpret_cast<const char*>(wert)) : QString("?");
+      };
+      hersteller = text(GL_VENDOR);
+      renderer = text(GL_RENDERER);
+      version = text(GL_VERSION);
+      kontext.doneCurrent();
+    }
+  }
+  const QString klein = renderer.toLower() + " " + hersteller.toLower();
+  const bool software = klein.contains("llvmpipe") || klein.contains("softpipe") || klein.contains("gdi generic") ||
+                        klein.contains("basic render") || klein.contains("swiftshader") || klein.contains("mesa offscreen");
+  const QString schleife = qEnvironmentVariableIsSet("QSG_RENDER_LOOP")
+                             ? qEnvironmentVariable("QSG_RENDER_LOOP") + " (erzwungen)"
+                             : (software ? QString("basic (GUI-Thread, wegen Software-OpenGL)") : QString("threaded (Standard)"));
+  zeilen << QString("Qt %1, Chromium %2").arg(qVersion()).arg(qWebEngineChromiumVersion());
+  zeilen << QString("OpenGL: %1 | %2 | %3").arg(hersteller, renderer, version);
+  zeilen << QString("Software-Rendering: %1").arg(software ? "JA – keine echte GPU (z. B. VM/Remotedesktop) -> hohe CPU-Last" : "nein");
+  zeilen << QString("Qt-Render-Schleife: %1").arg(schleife);
+  zeilen << QString("Web-Bildschicht (layer): %1").arg(Globals::ContextProperty("kinolelWebLayer").toBool() ? "an" : "aus");
+  zeilen << QString("Chromium-Zusatzflags: %1").arg(qEnvironmentVariable("QTWEBENGINE_CHROMIUM_FLAGS", "-"));
+  if (QScreen* bildschirm = QGuiApplication::primaryScreen())
+    zeilen << QString("Bildschirm: %1x%2 @ %3 Hz, Skalierung %4")
+                .arg(bildschirm->size().width()).arg(bildschirm->size().height())
+                .arg(bildschirm->refreshRate(), 0, 'f', 0).arg(bildschirm->devicePixelRatio());
+  return zeilen.join("\n");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

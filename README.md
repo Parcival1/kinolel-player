@@ -66,6 +66,26 @@ Konflikte entstehen fast nur in den mit `KinoLel` markierten Stellen. Danach Ver
 Daten (Anmeldung, Einstellungen, Logs) liegen unter `%LOCALAPPDATA%\KinoLel\profiles\<profil>\`.
 Eigene mpv-Einstellungen: `mpv.conf` in diesen Ordner legen.
 
+## Code signing policy
+
+Windows releases of KinoLel are prepared for code signing via the SignPath Foundation:
+**Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).**
+Until the project is approved, release binaries are unsigned.
+
+- Only binaries built from this repository by GitHub Actions on GitHub-hosted runners are signed
+  (`KinoLel.exe` and the installer `KinoLel-Setup-*.exe`); bundled third-party libraries (Qt, libmpv) are not signed by us.
+- Every signing request is approved manually in SignPath.
+- **Team roles:** Committers and reviewers: [Parcival1](https://github.com/Parcival1) · Approvers: [Parcival1](https://github.com/Parcival1).
+  Parts of the code are written with an AI coding assistant; all changes are pushed and released by the maintainer.
+- **Privacy:** This program will not transfer any information to other networked systems unless specifically requested by the
+  user or the person installing or operating it. It only connects to the KinoLel media server (`https://kinolel.de`,
+  set in `marke.cmake`), which the user signs in to; there is no telemetry and no update check.
+
+## What KinoLel does
+
+KinoLel is a desktop client for the KinoLel media server (Jellyfin). It shows the server's web interface and plays movies
+and series locally with mpv (direct play of HEVC/4K/HDR, DTS/TrueHD audio). Downloads: [Releases](../../releases).
+
 ---
 
 Basierend auf Jellyfin Desktop (früher Jellyfin Media Player, ursprünglich Plex Media Player „Konvergo“) – © deren Mitwirkende. Lizenz GPL-2.0.

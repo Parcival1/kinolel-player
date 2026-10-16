@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- KinoLel: SignPath-Artefakt-Konfiguration (in SignPath beim Projekt als Standard-Konfiguration hochladen).
+     Das Paket "zum-signieren" aus GitHub Actions ist ein ZIP mit Installer und Portable-ZIP.
+     Signiert wird nur, was aus diesem Repo gebaut wird: der Installer und KinoLel.exe (Qt/mpv-DLLs nicht). -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="KinoLel-Setup-*-x64.exe" max-matches="1" product-name="KinoLel">
+      <authenticode-sign />
+    </pe-file>
+    <zip-file path="KinoLel-Portable-*-x64.zip" max-matches="1">
+      <pe-file path="KinoLel.exe" product-name="KinoLel">
+        <authenticode-sign />
+      </pe-file>
+    </zip-file>
+  </zip-file>
+</artifact-configuration>

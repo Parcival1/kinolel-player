@@ -22,7 +22,7 @@ import os
 import re
 import sys
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 # Logo-Geometrie (aus dem SVG-Pfad des Lade-Overlays, viewBox 0 0 677 433)
 LOGO_W, LOGO_H = 677, 433
@@ -92,6 +92,47 @@ def hintergrund(w, h, grund, rund=0.0):
         leer.paste(bild, (0, 0), mk)
         bild = leer
     return bild
+
+
+def logo_frei(breite, marke, dick=False):
+    """Logo OHNE Hintergrundplatte (transparent, Lel 16.10.): weißer Rahmen, dunkle Leinwand innen, weißer Kreis mit
+    Play-Dreieck in Lavendel und feine dunkle Kontur außen – so auf hellem und dunklem Grund sichtbar."""
+    from PIL import ImageFilter
+    s = breite * SS / LOGO_W
+    w, h = round(LOGO_W * s), round(LOGO_H * s)
+    rand, r, k = (88, 112, 1.12) if dick else (50, 97, 1.0)
+    rand_px = max(2, round(breite * SS * (0.035 if dick else 0.022)))  # Konturbreite
+    def maske(zeichnen):
+        m = Image.new('L', (w + 2 * rand_px, h + 2 * rand_px), 0)
+        zeichnen(ImageDraw.Draw(m), rand_px)
+        return m
+    aussen = maske(lambda d, o: d.rounded_rectangle((o, o, o + LOGO_W * s, o + LOGO_H * s), radius=22 * s, fill=255))
+    innen = maske(lambda d, o: d.rounded_rectangle((o + rand * s, o + (rand - 5) * s, o + (677 - rand) * s,
+                                                    o + (433 - rand + 5) * s), radius=14 * s, fill=255))
+    kreis = maske(lambda d, o: d.ellipse((o + (338 - r) * s, o + (216 - r) * s, o + (338 + r) * s, o + (216 + r) * s), fill=255))
+    def dreieck_zeichnen(d, o):
+        d.polygon([(o + (354.5 + (308 - 354.5) * k) * s, o + (216 + (156 - 216) * k) * s),
+                   (o + (354.5 + (401 - 354.5) * k) * s, o + 216 * s),
+                   (o + (354.5 + (308 - 354.5) * k) * s, o + (216 + (279 - 216) * k) * s)], fill=255)
+    dreieck = maske(dreieck_zeichnen)
+    kontur = aussen.filter(ImageFilter.MaxFilter(rand_px * 2 + 1))
+    bild = Image.new('RGBA', aussen.size, (0, 0, 0, 0))
+    bild.paste(Image.new('RGBA', aussen.size, farbe(marke['APP_COLOR_BACKGROUND'], 150)), (0, 0), kontur)
+    leinwand = hintergrund(aussen.width, aussen.height, marke['APP_COLOR_BACKGROUND'])
+    bild.paste(leinwand, (0, 0), innen)
+    rahmen = ImageChops.subtract(aussen, innen)
+    weiss = Image.new('RGBA', aussen.size, (255, 255, 255, 255))
+    bild.paste(weiss, (0, 0), rahmen)
+    bild.paste(weiss, (0, 0), kreis)
+    bild.paste(Image.new('RGBA', aussen.size, farbe(marke['APP_COLOR_ACCENT'])), (0, 0), dreieck)
+    zu = (round(bild.width / SS), round(bild.height / SS))
+    return bild.resize(zu, Image.LANCZOS)
+
+
+def symbol_frei(groesse, marke):
+    """Quadratisches Programmsymbol mit transparentem Hintergrund (Logo zentriert, volle Breite)."""
+    bild = Image.new('RGBA', (groesse, groesse), (0, 0, 0, 0))
+    return mittig(bild, logo_frei(max(8, round(groesse * 0.94)), marke, dick=groesse <= 32))
 
 
 def mittig(grund, teil, dy=0):
@@ -190,8 +231,8 @@ def main():
         os.makedirs(os.path.dirname(p), exist_ok=True)
         return p
 
-    # Fenster-/Infobereich-Symbol + Vektor
-    symbol(256, marke).save(pfad('resources', 'images', 'icon.png'))
+    # Fenster-/Infobereich-Symbol + Vektor – transparent (Lel 16.10.)
+    symbol_frei(256, marke).save(pfad('resources', 'images', 'icon.png'))
     with open(pfad('resources', 'images', 'icon.svg'), 'w', encoding='utf-8') as f:
         f.write(svg_symbol(marke))
 
@@ -201,7 +242,7 @@ def main():
 
     # Windows-Programmsymbol (mehrere Größen)
     groessen = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]
-    bilder = [symbol(g, marke) for g in groessen]
+    bilder = [symbol_frei(g, marke) for g in groessen]
     bilder[-1].save(pfad('bundle', 'win', 'app.ico'), sizes=[(g, g) for g in groessen], append_images=bilder[:-1])
 
     # Installer-Bilder (Inno Setup, 200 %: 328 x 628 und 110 x 110)
@@ -212,16 +253,18 @@ def main():
         name = name.resize((280, round(name.height * 280 / name.width)), Image.LANCZOS)
     gross.alpha_composite(name, ((328 - name.width) // 2, 628 // 2 + 40))
     gross.convert('RGB').save(pfad('bundle', 'win', 'wizard-image.png'))
-    symbol(110, marke).save(pfad('bundle', 'win', 'wizard-small-image.png'))
+    symbol_frei(110, marke).save(pfad('bundle', 'win', 'wizard-small-image.png'))
 
     # MSIX-/Store-Bilder
     assets = ('bundle', 'msix', 'Assets')
-    symbol(50, marke).save(pfad(*assets, 'StoreLogo.png'))
-    symbol(150, marke, platte=True).save(pfad(*assets, 'Square150x150Logo.png'))
-    symbol(44, marke).save(pfad(*assets, 'Square44x44Logo.png'))
+    # Transparent (Lel 16.10.); die dunkle Leinwand + Kontur halten das Logo auf hellem Grund sichtbar.
+    # altform-unplated: Windows legt dann keine Farbplatte hinter das Symbol (Taskleiste, Startmenü).
+    symbol_frei(50, marke).save(pfad(*assets, 'StoreLogo.png'))
+    symbol_frei(150, marke).save(pfad(*assets, 'Square150x150Logo.png'))
+    symbol_frei(44, marke).save(pfad(*assets, 'Square44x44Logo.png'))
     for g in (16, 24, 32, 48, 256):
-        # nur mit Platte: ein weißes Logo ohne Platte wäre auf heller Taskleiste unsichtbar
-        symbol(g, marke).save(pfad(*assets, f'Square44x44Logo.targetsize-{g}.png'))
+        symbol_frei(g, marke).save(pfad(*assets, f'Square44x44Logo.targetsize-{g}.png'))
+        symbol_frei(g, marke).save(pfad(*assets, f'Square44x44Logo.targetsize-{g}_altform-unplated.png'))
     logo_mit_name(marke, 310, 150, a.banner, a.schrift).save(pfad(*assets, 'Wide310x150Logo.png'))
     logo_mit_name(marke, 620, 300, a.banner, a.schrift).save(pfad(*assets, 'SplashScreen.png'))
     # Vorschau für die Doku

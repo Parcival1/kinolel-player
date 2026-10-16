@@ -98,6 +98,10 @@ endif()
 
 if(WIN32)
   list(APPEND RESOURCE_FILES ${CMAKE_SOURCE_DIR}/bundle/win/iconres.rc)
+  # KinoLel: Versionsangaben (Produktname/Version) in der .exe – Voraussetzung für SignPath
+  string(REPLACE "." "," KINOLEL_VERSION_KOMMA "${VERSION_STRING},0")
+  configure_file(${CMAKE_SOURCE_DIR}/bundle/win/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/version.rc @ONLY)
+  list(APPEND RESOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
 endif()
 
 # Generate qt.conf so that dev builds find Qt plugins and QML files

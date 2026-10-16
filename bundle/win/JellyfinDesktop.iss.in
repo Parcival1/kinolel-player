@@ -28,6 +28,13 @@ AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 AppComments={#MyAppDescription}
+; Versionsangaben der Setup-Datei (Pflicht für Code-Signatur über SignPath)
+VersionInfoVersion={#MyAppVersion}.0
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription={#MyAppName} Setup
+VersionInfoCopyright=GPL-2.0
 AppContact={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes

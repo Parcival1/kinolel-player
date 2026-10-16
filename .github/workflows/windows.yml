@@ -25,6 +25,8 @@ permissions:
 
 jobs:
   build:
+    outputs:
+      signier-artefakt: ${{ steps.zum-signieren.outputs.artifact-id }}
     strategy:
       fail-fast: false
       matrix:
@@ -113,6 +115,21 @@ jobs:
       continue-on-error: true
       run: ./bundle/msix/msix-bauen.ps1 -Quelle build/portable -Ziel build
       shell: pwsh
+    - name: Leistungstest (Runner ohne GPU)
+      # Misst CPU-Last/Bildrate der App in mehreren Varianten (Ergebnis in der Zusammenfassung + Artefakt "leistung")
+      continue-on-error: true
+      timeout-minutes: 20
+      run: |
+        python -m pip install --quiet psutil websocket-client
+        python bundle/test/leistung.py build/portable leistung
+      shell: pwsh
+    - name: Archive Leistungstest
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: leistung
+        path: ${{ github.workspace }}/leistung/
+        if-no-files-found: ignore
     - name: Archive installer
       uses: actions/upload-artifact@v7
       with:
@@ -133,11 +150,56 @@ jobs:
           ${{ github.workspace }}/build/*.msix
           ${{ github.workspace }}/build/*.cer
         if-no-files-found: warn
-    - name: Vorab-Version veröffentlichen (nur bei Tag v*)
-      if: startsWith(github.ref, 'refs/tags/v')
+    # SignPath (Code-Signatur, kostenlos für Open Source): aktiv, sobald die Repo-Variable SIGNPATH_ORGANIZATION_ID
+    # gesetzt ist (Einrichtung: CT 103 /dokumentation/kinolel-player/SIGNPATH.md). Dann veröffentlicht der Job
+    # "signieren" die Version mit signiertem Installer; sonst wie bisher dieser Job unsigniert.
+    - name: Paket zum Signieren (SignPath)
+      id: zum-signieren
+      if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != ''
+      uses: actions/upload-artifact@v7
+      with:
+        name: zum-signieren
+        path: |
+          ${{ github.workspace }}/build/*-Setup-*.exe
+          ${{ github.workspace }}/build/*-Portable-*.zip
+        if-no-files-found: error
+    - name: Vorab-Version veröffentlichen (nur bei Tag v*, ohne SignPath)
+      if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID == ''
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         $dateien = @(Get-ChildItem build -File | Where-Object { $_.Name -match '-Setup-.*\.exe$|-Portable-.*\.zip$|\.msix$|\.cer$' } | ForEach-Object { $_.FullName })
         gh release create "${{ github.ref_name }}" $dateien --prerelease --title "Testversion ${{ github.ref_name }}" --notes-file TESTANLEITUNG.md
       shell: pwsh
+
+  signieren:
+    name: Signieren (SignPath) und veröffentlichen
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+    - uses: actions/checkout@v7
+    - name: Signieranfrage an SignPath (Lel genehmigt sie in SignPath)
+      uses: signpath/github-action-submit-signing-request@v3
+      with:
+        api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+        organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+        project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+        signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+        github-artifact-id: ${{ needs.build.outputs.signier-artefakt }}
+        wait-for-completion: true
+        wait-for-completion-timeout-in-seconds: 20000
+        output-artifact-directory: signiert
+    - name: MSIX holen
+      uses: actions/download-artifact@v8
+      with:
+        name: windows-x64-msix
+        path: msix
+    - name: Vorab-Version mit signiertem Installer veröffentlichen
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        ls -la signiert msix
+        gh release create "$GITHUB_REF_NAME" signiert/*-Setup-*.exe signiert/*-Portable-*.zip msix/* \
+          --prerelease --title "Testversion $GITHUB_REF_NAME (signiert)" --notes-file TESTANLEITUNG.md

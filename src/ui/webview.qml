@@ -84,6 +84,22 @@ Window
     onTriggered: mainWindow.toggleFullscreen()
   }
 
+  // KinoLel: Diagnose (Strg+Umschalt+G) – Grafikstatus von Chromium (chrome://gpu) plus Qt-Grafik oben auf der Seite.
+  // Nochmal Strg+Umschalt+G = zurück zu KinoLel.
+  property url kinolelVorDiagnose: ""
+  Action
+  {
+    shortcut: "Ctrl+Shift+G"
+    onTriggered: {
+      if (web.url.toString().indexOf("chrome://gpu") === 0) {
+        web.url = mainWindow.kinolelVorDiagnose.toString() !== "" ? mainWindow.kinolelVorDiagnose : mainWindow.webUrl
+      } else {
+        mainWindow.kinolelVorDiagnose = web.url
+        web.url = "chrome://gpu"
+      }
+    }
+  }
+
   Action
   {
     shortcut: "Alt+Return"
@@ -233,7 +249,8 @@ Window
 
     // this is needed to prevent intermittent(?) black screens when unminizing
     // or resumsing from suspend (linux/{x11/wayland}, possibly others).
-    layer.enabled: true
+    // KinoLel: nur unter Linux (kostet sonst in jedem Bild einen Vollbild-Durchgang -> Ruckeln), siehe main.cpp
+    layer.enabled: kinolelWebLayer
 
     webChannel: webChannelObject
     settings.errorPageEnabled: false
@@ -291,6 +308,13 @@ Window
       else if (loadingInfo.status == WebEngineView.LoadSucceededStatus)
       {
         console.log("WebEngineLoadRequest success: " + loadingInfo.url);
+        if (loadingInfo.url.toString().indexOf("chrome://gpu") === 0)
+        {
+          var info = "KinoLel – Grafik-Diagnose (zurück: Strg+Umschalt+G)\n" + components.system.grafikInfo();
+          web.runJavaScript("(function(t){var d=document.createElement('pre');" +
+                            "d.style.cssText='background:#151b2a;color:#9aa4ff;padding:14px;font-size:15px;white-space:pre-wrap;border:2px solid #9aa4ff';" +
+                            "d.textContent=t;document.body.insertBefore(d,document.body.firstChild);})(" + JSON.stringify(info) + ")");
+        }
       }
       else if (loadingInfo.status == WebEngineView.LoadFailedStatus)
       {

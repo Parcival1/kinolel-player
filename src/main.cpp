@@ -502,6 +502,16 @@ int main(int argc, char *argv[])
     // load QtWebChannel so that we can register our components with it.
     QQmlApplicationEngine *engine = Globals::Engine();
 
+    // KinoLel: Die Web-Bildschicht (layer.enabled) ist ein Linux-Workaround gegen schwarze Bilder und kostet
+    // in jedem Bild einen zusätzlichen Vollbild-Durchgang. Unter Windows/macOS aus; KINOLEL_WEB_LAYER=1/0 überschreibt.
+    bool webLayer = false;
+#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
+    webLayer = true;
+#endif
+    if (qEnvironmentVariableIsSet("KINOLEL_WEB_LAYER"))
+      webLayer = qEnvironmentVariable("KINOLEL_WEB_LAYER") == "1";
+    Globals::SetContextProperty("kinolelWebLayer", webLayer);
+
     Globals::SetContextProperty("components", &ComponentManager::Get().getQmlPropertyMap());
 
     // the only way to detect if QML parsing fails is to hook to this signal and then see
@@ -575,6 +585,10 @@ int main(int argc, char *argv[])
 
       // Initialize WindowManager with window reference
       WindowManager::Get().initializeWindow(window);
+
+      // KinoLel: Grafik-Diagnose ins Log (hilft bei Ruckeln/hoher Last)
+      for (const QString& zeile : SystemComponent::Get().grafikInfo().split("\n"))
+        qInfo() << "KinoLel-Grafik:" << qPrintable(zeile);
 
       // Handle other app focus by raising window
       QObject::connect(uniqueApp, &UniqueApplication::otherApplicationStarted, []() {
