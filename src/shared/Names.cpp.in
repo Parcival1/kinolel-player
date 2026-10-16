@@ -34,3 +34,8 @@ QString Names::AppUrl()
 {
   return QString("@APP_URL@");
 }
+
+QString Names::UpdateRepo()
+{
+  return QString("@APP_UPDATE_REPO@");
+}

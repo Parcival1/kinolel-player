@@ -20,10 +20,13 @@ set(APP_PUBLISHER "Lel")
 set(APP_URL "https://kinolel.de")
 
 # Version des Players (drei Zahlen; das MSIX-Paket hängt ".0" an). Bei jeder Verteilung erhöhen.
-set(APP_VERSION "0.1.1")
+set(APP_VERSION "0.1.2")
 
 # Technische Kennung ohne Leerzeichen/Umlaute (Dateinamen der Pakete, User-Agent)
 set(APP_ID "KinoLelPlayer")
+
+# Auto-Update: GitHub-Repo, dessen Releases die App beim Start prüft (Installer „*-Setup-*.exe“)
+set(APP_UPDATE_REPO "Parcival1/kinolel-player")
 
 # Inno-Setup-Kennung – NIE ändern (sonst erkennt Windows Updates nicht als dieselbe App)
 set(APP_INSTALLER_GUID "35069221-331e-4793-bed0-a842d0e01949")

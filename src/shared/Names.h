@@ -16,6 +16,7 @@ namespace Names
   QString AppId();
   QString ServerUrl();
   QString AppUrl();
+  QString UpdateRepo();
 };
 
 #endif //NAMES_H

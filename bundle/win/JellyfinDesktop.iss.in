@@ -115,6 +115,8 @@ Name: "{autodesktop}\{cm:TvModus,{#MyAppName}}"; Filename: "{app}\{#MyAppExeName
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /passive /norestart"; StatusMsg: "Visual C++ Redistributable ..."; Flags: waituntilterminated; Check: ShouldInstallVCRedist
 ; Launch app after install
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--desktop --windowed"; Description: "{cm:Starten,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+; Auto-Update aus der App (/SILENT): danach KinoLel wieder starten
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--desktop --windowed"; Flags: nowait; Check: WizardSilent
 
 [Code]
 var

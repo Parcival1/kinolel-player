@@ -77,6 +77,13 @@ public:
 
   Q_SIGNAL void updateInfoEmitted(QString url);
 
+  // KinoLel: eigenes Auto-Update über GitHub-Releases (SystemKinoLelUpdate.cpp)
+  Q_INVOKABLE void kinolelUpdatePruefen(bool sofort = false);
+  Q_INVOKABLE void kinolelUpdateInstallieren(const QString& url, const QString& version);
+  Q_SIGNAL void kinolelUpdateVerfuegbar(QString version, QString url, QString seite, bool einKlick);
+  Q_SIGNAL void kinolelUpdateFortschritt(int prozent);
+  Q_SIGNAL void kinolelUpdateFehler(QString text);
+
   // possible os types type enum
   enum PlatformType
   {

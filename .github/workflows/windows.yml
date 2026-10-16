@@ -123,6 +123,13 @@ jobs:
         python -m pip install --quiet psutil websocket-client
         python bundle/test/leistung.py build/portable leistung
       shell: pwsh
+    - name: Auto-Update-Test (installieren, als alte Version starten, aktualisieren)
+      continue-on-error: true
+      timeout-minutes: 15
+      run: |
+        $setup = (Get-ChildItem build -Filter "*-Setup-*.exe" | Select-Object -First 1).FullName
+        python bundle/test/update_test.py "$setup" leistung
+      shell: pwsh
     - name: Archive Leistungstest
       if: always()
       uses: actions/upload-artifact@v7

@@ -66,11 +66,11 @@ def logo_maske(breite, dick=False):
 
 
 def logo_bild(breite, weiss=(255, 255, 255, 255), akzent=None, dick=False):
-    m, t = logo_maske(breite, dick)
+    """Weißes Logo wie im Web: das Play-Dreieck ist AUSGESTANZT (zeigt den Hintergrund), nicht lila (Lel 16.10.).
+    akzent wird nicht mehr verwendet (nur noch für alte Aufrufe da)."""
+    m, _ = logo_maske(breite, dick)
     bild = Image.new('RGBA', m.size, (0, 0, 0, 0))
     bild.paste(Image.new('RGBA', m.size, weiss), (0, 0), m)
-    if akzent:
-        bild.paste(Image.new('RGBA', m.size, akzent), (0, 0), t)
     return bild
 
 
@@ -124,7 +124,7 @@ def logo_frei(breite, marke, dick=False):
     weiss = Image.new('RGBA', aussen.size, (255, 255, 255, 255))
     bild.paste(weiss, (0, 0), rahmen)
     bild.paste(weiss, (0, 0), kreis)
-    bild.paste(Image.new('RGBA', aussen.size, farbe(marke['APP_COLOR_ACCENT'])), (0, 0), dreieck)
+    bild.paste(leinwand, (0, 0), dreieck)  # Dreieck ausgestanzt = dunkle Leinwand (wie im Web)
     zu = (round(bild.width / SS), round(bild.height / SS))
     return bild.resize(zu, Image.LANCZOS)
 
@@ -199,7 +199,6 @@ def logo_mit_name(marke, breite, hoehe, banner, schrift, grund=True, anteil=0.36
 
 def svg_symbol(marke):
     g = marke['APP_COLOR_BACKGROUND']
-    a = marke['APP_COLOR_ACCENT']
     # 256er-Raster, Logo 72 % breit
     s = 256 * 0.72 / LOGO_W
     tx, ty = (256 - LOGO_W * s) / 2, (256 - LOGO_H * s) / 2
@@ -210,7 +209,6 @@ def svg_symbol(marke):
   <defs><radialGradient id="g" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="#151b2a"/><stop offset="0.6" stop-color="{g}"/></radialGradient></defs>
   <rect width="256" height="256" rx="56" fill="url(#g)"/>
   <g transform="translate({tx:.2f} {ty:.2f}) scale({s:.5f})">
-    <path d="M308,156L401,216L308,279Z" fill="{a}"/>
     <path fill="#fff" fill-rule="evenodd" d="{pfad}"/>
   </g>
 </svg>
