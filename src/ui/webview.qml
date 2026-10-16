@@ -310,7 +310,7 @@ Window
         console.log("WebEngineLoadRequest success: " + loadingInfo.url);
         if (loadingInfo.url.toString().indexOf("chrome://gpu") === 0)
         {
-          var info = "KinoLel – Grafik-Diagnose (zurück: Strg+Umschalt+G)\n" + components.system.grafikInfo();
+          var info = "KinoLel - Grafik-Diagnose (zurueck: Strg+Umschalt+G)\n" + components.system.grafikInfo();
           web.runJavaScript("(function(t){var d=document.createElement('pre');" +
                             "d.style.cssText='background:#151b2a;color:#9aa4ff;padding:14px;font-size:15px;white-space:pre-wrap;border:2px solid #9aa4ff';" +
                             "d.textContent=t;document.body.insertBefore(d,document.body.firstChild);})(" + JSON.stringify(info) + ")");

@@ -469,7 +469,7 @@ QString SystemComponent::grafikInfo() const
                              : (software ? QString("basic (GUI-Thread, wegen Software-OpenGL)") : QString("threaded (Standard)"));
   zeilen << QString("Qt %1, Chromium %2").arg(qVersion()).arg(qWebEngineChromiumVersion());
   zeilen << QString("OpenGL: %1 | %2 | %3").arg(hersteller, renderer, version);
-  zeilen << QString("Software-Rendering: %1").arg(software ? "JA – keine echte GPU (z. B. VM/Remotedesktop) -> hohe CPU-Last" : "nein");
+  zeilen << QString("Software-Rendering: %1").arg(software ? "JA - keine echte GPU (z. B. VM/Remotedesktop) -> hohe CPU-Last" : "nein");
   zeilen << QString("Qt-Render-Schleife: %1").arg(schleife);
   zeilen << QString("Web-Bildschicht (layer): %1").arg(Globals::ContextProperty("kinolelWebLayer").toBool() ? "an" : "aus");
   zeilen << QString("Chromium-Zusatzflags: %1").arg(qEnvironmentVariable("QTWEBENGINE_CHROMIUM_FLAGS", "-"));

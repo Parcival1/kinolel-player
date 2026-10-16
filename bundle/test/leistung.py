@@ -8,7 +8,9 @@ DevTools-Protokoll (--remote-debugging-port) und psutil:
     Hintergrund mit Ken-Burns-Zoom, Fortschrittsbalken (width-Animation), 24 Kacheln mit backdrop-filter: blur
 Der Runner hat KEINE GPU (wie eine VM ohne Grafikkarte) – die Werte zeigen den Software-Pfad.
 
-Aufruf: python leistung.py <ordner-mit-KinoLel.exe> <ausgabe-ordner>
+Aufruf: python leistung.py <ordner-mit-KinoLel.exe> <ausgabe-ordner> [<ordner-mit-mesa-dlls>]
+Mit Mesa-Ordner (opengl32.dll + libgallium_wgl.dll aus mesa-dist-win) gibt es zusätzlich Varianten mit aktuellem
+Mesa-llvmpipe statt Qts altem opengl32sw.dll.
 """
 import base64
 import json
@@ -18,19 +20,26 @@ import sys
 import time
 import urllib.request
 
+import shutil
+
 import psutil
 import websocket
 
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 APP_ORDNER, AUSGABE = sys.argv[1], sys.argv[2]
-EXE = os.path.join(APP_ORDNER, 'KinoLel.exe')
+MESA = sys.argv[3] if len(sys.argv) > 3 else None
 PORT = 9222
 MESSDAUER = 15
 
+# (Name, Umgebung, Ordner-Variante, Testseite mit Dauer-Animation?)
 VARIANTEN = [
-    ('v0.1.1 Standard', {}),
-    ('alt: Web-Bildschicht an (wie v0.1.0)', {'KINOLEL_WEB_LAYER': '1'}),
-    ('Chromium --disable-gpu', {'QTWEBENGINE_CHROMIUM_FLAGS': '--disable-gpu'}),
-    ('Qt-Render-Thread erzwungen', {'QSG_RENDER_LOOP': 'threaded'}),
+    ('Standard (Qt-Software-GL)', {}, 'app', True),
+    ('wie v0.1.0: Web-Bildschicht an', {'KINOLEL_WEB_LAYER': '1'}, 'app', True),
+    ('Chromium --disable-gpu', {'QTWEBENGINE_CHROMIUM_FLAGS': '--disable-gpu'}, 'app', True),
+    ('Qt-Render-Thread erzwungen', {'QSG_RENDER_LOOP': 'threaded'}, 'app', True),
+    ('Testseite OHNE Dauer-Animation', {}, 'app', False),
+    ('aktuelles Mesa (llvmpipe)', {}, 'mesa', True),
+    ('aktuelles Mesa + Render-Thread', {'QSG_RENDER_LOOP': 'threaded'}, 'mesa', True),
 ]
 
 STARTSEITE_NACHBAU = r"""
@@ -119,12 +128,13 @@ def seite_finden(frist):
     return None
 
 
-def messen(name, env_zusatz, nr):
+def messen(name, env_zusatz, ordner, animiert, nr):
     ergebnis = {'variante': name, 'env': env_zusatz}
     env = dict(os.environ)
     env.update(env_zusatz)
-    proc = subprocess.Popen([EXE, '--desktop', '--windowed', f'--remote-debugging-port={PORT}', '--log-level', 'info'],
-                            cwd=APP_ORDNER, env=env)
+    exe = os.path.join(ordner, 'KinoLel.exe')
+    proc = subprocess.Popen([exe, '--desktop', '--windowed', f'--remote-debugging-port={PORT}', '--log-level', 'info'],
+                            cwd=ordner, env=env)
     try:
         ziel = seite_finden(time.time() + 90)
         if not ziel:
@@ -145,6 +155,8 @@ def messen(name, env_zusatz, nr):
 
         # Nachgebaute Startseite mit Dauer-Animationen + Blur
         cdp.js(STARTSEITE_NACHBAU)
+        if not animiert:
+            cdp.js("document.getAnimations().forEach(function(a){a.pause()});true")
         time.sleep(3)
         cdp.js(RAF_START)
         c0, t0 = cpu_sekunden(proc.pid), time.time()
@@ -171,7 +183,7 @@ def messen(name, env_zusatz, nr):
                 pass
         time.sleep(4)
         # Log dieser Variante sichern (portabler Modus: Daten liegen im App-Ordner)
-        for wurzel, _, dateien in os.walk(APP_ORDNER):
+        for wurzel, _, dateien in os.walk(ordner):
             if 'KinoLel.log' in dateien:
                 quelle = os.path.join(wurzel, 'KinoLel.log')
                 with open(quelle, encoding='utf-8', errors='replace') as f:
@@ -185,9 +197,22 @@ def messen(name, env_zusatz, nr):
 def main():
     os.makedirs(AUSGABE, exist_ok=True)
     print('Kerne:', psutil.cpu_count(), '| CPU-Prozent = Summe aller App-Prozesse, 100 % = ein voller Kern')
+    ordner = {'app': APP_ORDNER}
+    if MESA:
+        # Kopie der App mit aktuellem Mesa als Software-OpenGL (Qt lädt opengl32sw.dll, wenn keine GPU da ist)
+        ziel = APP_ORDNER.rstrip('/\\') + '-mesa'
+        shutil.rmtree(ziel, ignore_errors=True)
+        shutil.copytree(APP_ORDNER, ziel)
+        shutil.copy(os.path.join(MESA, 'opengl32.dll'), os.path.join(ziel, 'opengl32sw.dll'))
+        for datei in os.listdir(MESA):
+            if datei.lower() != 'opengl32.dll':
+                shutil.copy(os.path.join(MESA, datei), os.path.join(ziel, datei))
+        ordner['mesa'] = ziel
     alle = []
-    for nr, (name, env) in enumerate(VARIANTEN, 1):
-        e = messen(name, env, nr)
+    for nr, (name, env, art, animiert) in enumerate(VARIANTEN, 1):
+        if art not in ordner:
+            continue
+        e = messen(name, env, ordner[art], animiert, nr)
         print(json.dumps(e, ensure_ascii=False))
         alle.append(e)
     with open(os.path.join(AUSGABE, 'leistung.json'), 'w', encoding='utf-8') as f:
