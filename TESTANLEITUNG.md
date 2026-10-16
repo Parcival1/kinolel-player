@@ -26,6 +26,17 @@ Ohne Installation: `KinoLel-Portable-<Version>-x64.zip` entpacken und `KinoLel.e
 | 10 | TV-Modus | Startmenü **KinoLel (TV-Modus)**: Vollbild, große TV-Oberfläche, Bedienung mit Pfeiltasten/Enter/Rücktaste oder Gamepad |
 | 11 | Medientasten | Wiedergabe/Pause/Weiter auf der Tastatur |
 
+## Wenn es ruckelt oder die Lüfter laufen (Diagnose, ab v0.1.1)
+
+1. In KinoLel **Strg+Umschalt+G** drücken → Diagnoseseite. Oben im lila Kasten steht die Grafik der App:
+   - „Software-Rendering: **JA**“ = keine echte Grafikkarte (z. B. in einer VM oder per Remotedesktop) → die CPU rechnet
+     jedes Bild selbst. Dann bitte **auf einem PC mit Grafikkarte direkt** testen (nicht per Remotedesktop).
+   - „OpenGL: …“ zeigt den Grafiktreiber (z. B. NVIDIA, AMD, Intel).
+   - Darunter „Graphics Feature Status“ von Chromium: sollte überwiegend „Hardware accelerated“ zeigen.
+   Bildschirmfoto davon an Claude. Nochmal **Strg+Umschalt+G** = zurück.
+2. **Task-Manager** (Strg+Umschalt+Esc) → Prozesse → Spalten „CPU“ und „GPU“ (Rechtsklick auf die Kopfzeile → „GPU“):
+   KinoLel und QtWebEngineProcess auf der Startseite einige Sekunden beobachten, Werte notieren.
+
 ## Wenn etwas nicht geht
 
 - Kurz notieren, was passiert (Film, Schritt, ggf. Bildschirmfoto).

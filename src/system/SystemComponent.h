@@ -37,6 +37,8 @@ public:
   Q_INVOKABLE QVariantMap systemInformation() const;
   // KinoLel: Grafik-Diagnose (OpenGL-Treiber, Software-Rendering, Render-Schleife) für Log und Strg+Umschalt+G
   Q_INVOKABLE QString grafikInfo() const;
+  // KinoLel: true, wenn OpenGL nur in Software läuft (keine GPU, z. B. VM/Remotedesktop)
+  bool softwareGrafik() const;
   Q_INVOKABLE void exit();
   Q_INVOKABLE static void restart();
 

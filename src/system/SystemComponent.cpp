@@ -435,9 +435,8 @@ void SystemComponent::cancelServerConnectivity()
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // KinoLel: Welche Grafik nutzt die App? Wichtig bei Ruckeln/hoher Last: Software-OpenGL (z. B. VM ohne GPU)
 // rendert alles auf der CPU, Qt nutzt dann außerdem die einfache Render-Schleife im GUI-Thread.
-QString SystemComponent::grafikInfo() const
+static QStringList glAngaben()
 {
-  QStringList zeilen;
   QString hersteller, renderer, version;
   QOpenGLContext* gemeinsam = QOpenGLContext::globalShareContext();
   if (gemeinsam)
@@ -461,9 +460,28 @@ QString SystemComponent::grafikInfo() const
       kontext.doneCurrent();
     }
   }
-  const QString klein = renderer.toLower() + " " + hersteller.toLower();
-  const bool software = klein.contains("llvmpipe") || klein.contains("softpipe") || klein.contains("gdi generic") ||
-                        klein.contains("basic render") || klein.contains("swiftshader") || klein.contains("mesa offscreen");
+  return {hersteller, renderer, version};
+}
+
+static bool istSoftwareGrafik(const QStringList& gl)
+{
+  const QString klein = gl.join(" ").toLower();
+  return klein.contains("llvmpipe") || klein.contains("softpipe") || klein.contains("gdi generic") ||
+         klein.contains("basic render") || klein.contains("swiftshader") || klein.contains("mesa offscreen");
+}
+
+bool SystemComponent::softwareGrafik() const
+{
+  static const bool software = istSoftwareGrafik(glAngaben());
+  return software;
+}
+
+QString SystemComponent::grafikInfo() const
+{
+  QStringList zeilen;
+  const QStringList gl = glAngaben();
+  const QString hersteller = gl.value(0), renderer = gl.value(1), version = gl.value(2);
+  const bool software = istSoftwareGrafik(gl);
   const QString schleife = qEnvironmentVariableIsSet("QSG_RENDER_LOOP")
                              ? qEnvironmentVariable("QSG_RENDER_LOOP") + " (erzwungen)"
                              : (software ? QString("basic (GUI-Thread, wegen Software-OpenGL)") : QString("threaded (Standard)"));
@@ -473,6 +491,8 @@ QString SystemComponent::grafikInfo() const
   zeilen << QString("Qt-Render-Schleife: %1").arg(schleife);
   zeilen << QString("Web-Bildschicht (layer): %1").arg(Globals::ContextProperty("kinolelWebLayer").toBool() ? "an" : "aus");
   zeilen << QString("Chromium-Zusatzflags: %1").arg(qEnvironmentVariable("QTWEBENGINE_CHROMIUM_FLAGS", "-"));
+  zeilen << QString("Leistungsregeln kinolel.de: %1").arg(qEnvironmentVariable("KINOLEL_LEISTUNG") == "0" ? "aus"
+                         : (software ? "an (Ken-Burns aus, Fortschritt in Stufen, Weichzeichner aus)" : "an (Ken-Burns aus, Fortschritt in Stufen)"));
   if (QScreen* bildschirm = QGuiApplication::primaryScreen())
     zeilen << QString("Bildschirm: %1x%2 @ %3 Hz, Skalierung %4")
                 .arg(bildschirm->size().width()).arg(bildschirm->size().height())
@@ -612,6 +632,9 @@ QString SystemComponent::getNativeShellScript()
   // KinoLel: Name und fester Server aus marke.cmake
   clientData.insert("appName", QJsonValue::fromVariant(Names::AppName()));
   clientData.insert("serverUrl", QJsonValue::fromVariant(Names::ServerUrl()));
+  // KinoLel: Leistungsregeln für kinolel.de (nativeshell.js); KINOLEL_LEISTUNG=0 / KINOLEL_SOFTWARE=0 nur für Messungen
+  clientData.insert("leistungsRegeln", qEnvironmentVariable("KINOLEL_LEISTUNG") != "0");
+  clientData.insert("softwareRendering", softwareGrafik() && qEnvironmentVariable("KINOLEL_SOFTWARE") != "0");
   QString defaultMode = SettingsComponent::Get().value(SETTINGS_SECTION_MAIN, "layout").toString();
 
   QFile flatpakOsFile {"/run/host/os-release"};

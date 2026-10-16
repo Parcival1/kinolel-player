@@ -11,8 +11,6 @@ env:
   # using older version due to severe memory leak
   # https://qt-project.atlassian.net/browse/QTBUG-141377
   QT_VERSION: "6.9.3"
-  # Mesa für Rechner ohne GPU (Software-OpenGL), https://github.com/pal1000/mesa-dist-win (MIT)
-  MESA_VERSION: "26.2.4"
 
 on:
   workflow_dispatch:
@@ -123,14 +121,7 @@ jobs:
       timeout-minutes: 20
       run: |
         python -m pip install --quiet psutil websocket-client
-        # aktuelles Mesa (llvmpipe) zum Vergleich mit Qts altem opengl32sw.dll
-        curl -sL -o mesa.7z "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/mesa3d-$env:MESA_VERSION-release-msvc.7z"
-        7z x mesa.7z -omesa-voll | Out-Null
-        $x64 = (Get-ChildItem mesa-voll -Recurse -Filter opengl32.dll | Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1).Directory.FullName
-        Get-ChildItem $x64 | Format-Table Name, Length
-        New-Item -ItemType Directory -Force build/mesa | Out-Null
-        Copy-Item "$x64/opengl32.dll", "$x64/libgallium_wgl.dll" build/mesa/
-        python bundle/test/leistung.py build/portable leistung build/mesa
+        python bundle/test/leistung.py build/portable leistung
       shell: pwsh
     - name: Archive Leistungstest
       if: always()

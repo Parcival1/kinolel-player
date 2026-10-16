@@ -33,33 +33,39 @@ MESSDAUER = 15
 
 # (Name, Umgebung, Ordner-Variante, Testseite mit Dauer-Animation?)
 VARIANTEN = [
-    ('Standard (Qt-Software-GL)', {}, 'app', True),
-    ('wie v0.1.0: Web-Bildschicht an', {'KINOLEL_WEB_LAYER': '1'}, 'app', True),
-    ('Chromium --disable-gpu', {'QTWEBENGINE_CHROMIUM_FLAGS': '--disable-gpu'}, 'app', True),
-    ('Qt-Render-Thread erzwungen', {'QSG_RENDER_LOOP': 'threaded'}, 'app', True),
-    ('Testseite OHNE Dauer-Animation', {}, 'app', False),
-    ('aktuelles Mesa (llvmpipe)', {}, 'mesa', True),
-    ('aktuelles Mesa + Render-Thread', {'QSG_RENDER_LOOP': 'threaded'}, 'mesa', True),
+    ('v0.1.1: mit Leistungsregeln (ohne GPU: Weichzeichner aus)', {}, 'app', True),
+    ('v0.1.1: Leistungsregeln, Weichzeichner an (wie mit GPU)', {'KINOLEL_SOFTWARE': '0'}, 'app', True),
+    ('ohne Leistungsregeln, Bildschicht aus', {'KINOLEL_LEISTUNG': '0'}, 'app', True),
+    ('wie v0.1.0: ohne Regeln, Bildschicht an', {'KINOLEL_LEISTUNG': '0', 'KINOLEL_WEB_LAYER': '1'}, 'app', True),
+    ('Referenz: Testseite ganz ohne Animation', {'KINOLEL_LEISTUNG': '0'}, 'app', False),
 ]
 
 STARTSEITE_NACHBAU = r"""
 (function () {
+  // Nachbau der KinoLel-Startseite mit denselben Klassen wie die Media Bar auf kinolel.de, damit die
+  // Leistungsregeln der App (nativeshell.js) genauso greifen: Ken-Burns-Zoom auf .backdrop.high-quality,
+  // Fortschrittsbalken .spec-progress (width-Übergang 12 s), 24 Kacheln mit backdrop-filter: blur(20px).
   var s = document.createElement('style');
-  s.textContent = '@keyframes klkb{from{transform:scale(1)}to{transform:scale(1.18)}}' +
-    '@keyframes klpr{from{width:0}to{width:100%}}' +
+  s.textContent = '@keyframes kenBurnsZoomIn{from{transform:scale(1)}to{transform:scale(1.18)}}' +
     '#kltest{position:fixed;inset:0;z-index:2147483600;overflow:hidden;background:#0b0f18}' +
-    '#kltest .bg{position:absolute;inset:-5%;background:radial-gradient(circle at 30% 30%,#9aa4ff,#151b2a 40%,#0b0f18),' +
-    'repeating-linear-gradient(45deg,#223 0 20px,#334 20px 40px);animation:klkb 12s linear infinite alternate}' +
-    '#kltest .pr{position:absolute;left:0;bottom:0;height:4px;background:#9aa4ff;animation:klpr 12s linear infinite}' +
+    '#kltest .backdrop{position:absolute;inset:-5%;background:radial-gradient(circle at 30% 30%,#9aa4ff,#151b2a 40%,#0b0f18),' +
+    'repeating-linear-gradient(45deg,#223 0 20px,#334 20px 40px);animation:kenBurnsZoomIn 12s linear infinite alternate}' +
+    '#kltest .spec-progress{position:absolute;left:0;bottom:0;height:4px;width:0;background:#9aa4ff}' +
     '#kltest .gr{position:absolute;inset:10% 5% 5% 5%;display:grid;grid-template-columns:repeat(6,1fr);gap:16px}' +
     '#kltest .k{height:150px;border-radius:12px;background:rgba(21,27,42,.35);backdrop-filter:blur(20px);' +
     '-webkit-backdrop-filter:blur(20px);border:1px solid rgba(154,164,255,.25)}';
   document.head.appendChild(s);
   var d = document.createElement('div'); d.id = 'kltest';
-  var h = '<div class="bg"></div><div class="gr">';
+  var h = '<div class="backdrop high-quality"></div><div class="gr">';
   for (var i = 0; i < 24; i++) h += '<div class="k"></div>';
-  d.innerHTML = h + '</div><div class="pr"></div>';
+  d.innerHTML = h + '</div><div class="spec-progress"></div>';
   document.body.appendChild(d);
+  var p = d.querySelector('.spec-progress');
+  function lauf() {
+    p.style.transition = 'none'; p.style.width = '0'; void p.offsetWidth;
+    p.style.transition = 'width 12s linear'; p.style.width = '100%';
+  }
+  lauf(); window.__klTimer = setInterval(lauf, 12000);
   return true;
 })()
 """

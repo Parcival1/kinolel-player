@@ -592,3 +592,40 @@ window.jmpInfo.settingsUpdate.push(function(section) {
         }
     }
 });
+
+// KinoLel: Leistung (Lel 16.10.: App ruckelte, Lüfter liefen). Gemessen mit bundle/test/leistung.py: Dauer-Animationen
+// hinter Weichzeichner-Flächen (Ken-Burns-Zoom und fließender Fortschrittsbalken der Media Bar, 27 backdrop-filter auf der
+// Startseite) zwingen die App zu dauernd neuen Bildern; ohne GPU schafft Chromium davon nur ~3 Bilder/s bei voller CPU-Last.
+// In der App daher: Ken-Burns-Zoom aus, Fortschrittsbalken in Stufen (2 Bilder/s statt 60); ohne GPU zusätzlich die
+// Hintergrund-Weichzeichner aus. Nur auf dem KinoLel-Server, der Browser bleibt unverändert.
+(function kinolelLeistung() {
+    if (jmpInfo.leistungsRegeln === false) return;
+    let server = '';
+    try { server = new URL(jmpInfo.serverUrl).host; } catch (e) { return; }
+    if (location.host !== server) return;
+
+    let stil =
+        '.backdrop.high-quality{animation:none!important}' +
+        '.spec-progress{transition-timing-function:steps(24,end)!important}';
+    if (jmpInfo.softwareRendering) {
+        stil += '*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}';
+    }
+    const einfuegen = () => {
+        if (document.getElementById('kinolel-app-leistung')) return;
+        const element = document.createElement('style');
+        element.id = 'kinolel-app-leistung';
+        element.textContent = stil;
+        (document.head || document.documentElement).appendChild(element);
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', einfuegen);
+    } else {
+        einfuegen();
+    }
+    // Ken-Burns-Zoom unter anderem Namen/Selektor: beim Start sofort anhalten
+    document.addEventListener('animationstart', (e) => {
+        if (/ken.?burns/i.test(e.animationName) && e.target && e.target.style) {
+            e.target.style.animation = 'none';
+        }
+    }, true);
+})();
