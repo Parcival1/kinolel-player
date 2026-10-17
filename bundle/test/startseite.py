@@ -283,6 +283,37 @@ class Aufnahme:
         return os.path.exists(self.ziel) and os.path.getsize(self.ziel) > 1000, fehler[-400:]
 
 
+def flackern(video):
+    """Video in kleine Graustufenbilder zerlegen (10/s) und Bildsprünge zählen.
+    Blitzer = ein Bild weicht stark von beiden Nachbarn ab, die Nachbarn sind sich aber ähnlich (kurz schwarz/weiß/leer).
+    Wechsel = große Änderung, die bleibt (z. B. Karussell-Bild, Seitenaufbau)."""
+    exe = ffmpeg_pfad()
+    if not exe or not os.path.exists(video):
+        return None
+    b, h = 64, 36
+    roh = subprocess.run([exe, '-hide_banner', '-loglevel', 'error', '-i', video, '-vf', f'fps=10,scale={b}:{h},format=gray',
+                          '-f', 'rawvideo', '-'], capture_output=True, timeout=300).stdout
+    n = b * h
+    bilder = [roh[i:i + n] for i in range(0, len(roh) - n + 1, n)]
+    if len(bilder) < 3:
+        return None
+    def abstand(x, y):
+        return sum(abs(p - q) for p, q in zip(x, y)) / n
+    hell = [round(sum(x) / n, 1) for x in bilder]
+    d = [abstand(bilder[i - 1], bilder[i]) for i in range(1, len(bilder))]
+    blitzer, wechsel = [], []
+    for i in range(1, len(bilder) - 1):
+        vor, nach = d[i - 1], d[i]
+        if vor > 12 and nach > 12 and abstand(bilder[i - 1], bilder[i + 1]) < 4:
+            blitzer.append(round(i / 10, 1))
+    for i, x in enumerate(d, 1):
+        if x > 12:
+            wechsel.append(round(i / 10, 1))
+    return {'bilder': len(bilder), 'blitzer': len(blitzer), 'blitzer_bei_s': blitzer[:40], 'grosse_wechsel': len(wechsel),
+            'wechsel_bei_s': wechsel[:60], 'helligkeit_min_max': [min(hell), max(hell)],
+            'helligkeit_je_s': [hell[i] for i in range(0, len(hell), 10)]}
+
+
 def warten(cdp, ausdruck, frist, pause=0.5):
     while time.time() < frist:
         try:
@@ -370,6 +401,10 @@ def beobachten(cdp, proc, nr, name, aenderung, ereignisse):
         v['video'] = os.path.basename(video) if a[0] else None
         if a[1]:
             v['video_fehler'] = a[1]
+        try:
+            v['flackern'] = flackern(video)
+        except Exception as e:  # noqa: BLE001
+            v['flackern'] = {'fehler': repr(e)}
     zustand = cdp.js(ZUSTAND) or {}
     ziele = cdp.js(ZIELE) or []
     # Mutationen nur im Beobachtungszeitraum (ab start_js)
@@ -485,6 +520,10 @@ def sitzung(teil, befehl, cwd, port, varianten, ergebnis):
             ergebnis['anmeldung_bis_startseite_s_' + teil] = round(time.time() - t_anm, 1)
             time.sleep(min(BEOBACHTUNG, 30))  # erste Startseite nach der Anmeldung (wie bei Lel) mit aufnehmen
         aufnahme.stop()
+        try:
+            ergebnis['flackern_anmeldung_' + teil] = flackern(aufnahme.ziel)
+        except Exception as e:  # noqa: BLE001
+            ergebnis['flackern_anmeldung_' + teil] = {'fehler': repr(e)}
         daten = cdp.rufe('Page.captureScreenshot', format='jpeg', quality=60).get('data')
         if daten:
             with open(os.path.join(AUSGABE, f'{teil}-0-nach-anmeldung.jpg'), 'wb') as f:
@@ -548,12 +587,13 @@ def bericht(ergebnis):
          f"Anmeldung bis Startseite: App {ergebnis.get('anmeldung_bis_startseite_s_app', '–')} s, "
          f"Chrome {ergebnis.get('anmeldung_bis_startseite_s_chrome', '–')} s. "
          f"Fehler: {'; '.join(f'{k}: {w}' for k, w in ergebnis.items() if k.startswith('fehler')) or 'keine'}", '',
-         '| Programm | Variante | Anfragen/s (max) | DOM-Mutationen/s | Knoten neu/s | Abschnitte neu | Seiten neu geladen | bootstrap() | CPU % | Fehler |',
-         '|---|---|---|---|---|---|---|---|---|---|']
+         '| Programm | Variante | Anfragen/s (max) | DOM-Mutationen/s | Knoten neu/s | Abschnitte neu | Seiten neu geladen | bootstrap() | CPU % | Blitzer / Bildwechsel (Video) | Fehler |',
+         '|---|---|---|---|---|---|---|---|---|---|---|']
     for v in ergebnis['varianten']:
         z.append(f"| {v.get('teil')} | {v['variante']} | {v.get('anfragen_pro_s')} ({v.get('anfragen_max_pro_s')}) | {v.get('dom_mutationen_pro_s')} | "
                  f"{v.get('knoten_eingefuegt_pro_s')} | {v.get('abschnitte_neu')} | {v.get('seiten_neu_geladen')} | "
-                 f"{v.get('bootstrap_aufrufe_gesamt')} | {v.get('cpu_prozent')} | {v.get('fehler', '')} |")
+                 f"{v.get('bootstrap_aufrufe_gesamt')} | {v.get('cpu_prozent')} | "
+                 f"{(v.get('flackern') or {}).get('blitzer', '–')} / {(v.get('flackern') or {}).get('grosse_wechsel', '–')} | {v.get('fehler', '')} |")
     for v in ergebnis['varianten'][:1]:
         z += ['', f"Häufigste Anfragen ({v['variante']}):", '']
         z += [f'- {n}× {k}' for k, n in v.get('top_anfragen', [])[:12]]
