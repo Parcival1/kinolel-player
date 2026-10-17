@@ -19,6 +19,10 @@ on:
       - main
     tags:
       - "v*"
+    # reine Test-Änderungen am Startseiten-Test bauen nicht neu (eigener Workflow startseite.yml)
+    paths-ignore:
+      - bundle/test/startseite.py
+      - .github/workflows/startseite.yml
 
 permissions:
   contents: write
