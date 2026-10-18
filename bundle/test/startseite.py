@@ -35,14 +35,19 @@ BENUTZER = os.environ.get('KINOLEL_TEST_USER', 'kinolel-hilfe')
 PASSWORT = (os.environ.get('KINOLEL_TEST_PW') or '').strip('\r\n')
 BEOBACHTUNG = int(os.environ.get('BEOBACHTUNG', '60'))
 
-# Varianten: Name -> Änderung an kinolel.js (None = unverändert, 'leer' = gar nicht laden, Liste = (Muster, Ersatz) als Regex)
+# Varianten: Name -> {URL-Teil: Änderung} für Zusatz-Skripte von kinolel.de (None = unverändert, 'leer' = nicht laden,
+# Liste = (Muster, Ersatz) als Regex). Abgefangen per DevTools (Fetch), der Server bleibt unverändert.
+KJS = 'kinolel/kinolel.js'
 VARIANTEN = [
-    ('original', None),
-    ('ohne-kinolel-js', 'leer'),
-    ('ohne-karussellNachstarten', [(r'setInterval\(karussellNachstarten, 4000\);', ''), (r'karussellNachstarten\(\);', '')]),
-    ('ohne-kopfUeberlauf', [(r'kopfUeberlauf\(\);', '')]),
-    ('ohne-spracheNachLogin', [(r'spracheNachLogin\(\);', '')]),
+    ('original', {}),
+    ('ohne-kinolel-js', {KJS: 'leer'}),
+    ('ohne-karussellNachstarten', {KJS: [(r'setInterval\(karussellNachstarten, 4000\);', ''), (r'karussellNachstarten\(\);', '')]}),
+    ('ohne-kopfUeberlauf', {KJS: [(r'kopfUeberlauf\(\);', '')]}),
+    ('ohne-spracheNachLogin', {KJS: [(r'spracheNachLogin\(\);', '')]}),
+    ('ohne-mediabar', {'MediaBar/slideshowpure.js': 'leer'}),
+    ('ohne-jellyfin-enhanced', {'JellyfinEnhanced/script': 'leer'}),
 ]
+ABFANGEN = ['*/kinolel/kinolel.js*', '*/MediaBar/slideshowpure.js*', '*/JellyfinEnhanced/script*']
 if os.environ.get('VARIANTEN'):
     gewuenscht = [v.strip() for v in os.environ['VARIANTEN'].split(',')]
     VARIANTEN = [v for v in VARIANTEN if v[0] in gewuenscht]
@@ -268,7 +273,7 @@ class Aufnahme:
         if not exe:
             return
         self.proc = subprocess.Popen([exe, '-hide_banner', '-loglevel', 'error', '-y', '-f', 'gdigrab', '-framerate', '10',
-                                      '-draw_mouse', '0', '-i', 'desktop', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+                                      '-draw_mouse', '0', '-i', 'desktop', '-vf', 'scale=1280:-2',
                                       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '30', '-pix_fmt', 'yuv420p', ziel],
                                      stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
@@ -447,20 +452,47 @@ def beobachten(cdp, proc, nr, name, aenderung, ereignisse):
     v['top_anfragen'] = sorted(je_pfad.items(), key=lambda x: -x[1])[:30]
     v['seiten_neu_geladen'] = len([n for n in ereignisse['navigation'][nav_vorher:] if n[1] == 'frameNavigated'])
     v['navigation'] = ereignisse['navigation'][nav_vorher:][:40]
-    v['kinolel_js_ersetzt'] = ereignisse['kinolel_js']
+    v['skripte_ersetzt'] = ereignisse['kinolel_js']
     v['konsole'] = ereignisse['konsole'][:60]
     return v
 
 
-def sitzung(teil, befehl, cwd, port, varianten, ergebnis):
+def fenster_maximieren(pid):
+    """Sichtbares Hauptfenster des Prozesses maximieren (Windows)."""
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    gefunden = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def je_fenster(hwnd, _):
+        p = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(p))
+        if p.value == pid and user32.IsWindowVisible(hwnd):
+            gefunden.append(hwnd)
+        return True
+    user32.EnumWindows(je_fenster, 0)
+    for hwnd in gefunden:
+        user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
+    return len(gefunden)
+
+
+def sitzung(teil, befehl, cwd, port, varianten, ergebnis, env=None, maximiert=False):
     """Programm (KinoLel-App oder Chrome als Vergleich) starten, anmelden, Varianten beobachten, abmelden."""
-    proc = subprocess.Popen(befehl, cwd=cwd)
+    umgebung = dict(os.environ)
+    umgebung.update(env or {})
+    umgebung.pop('KINOLEL_TEST_PW', None)  # Programm selbst braucht das Passwort nicht
+    proc = subprocess.Popen(befehl, cwd=cwd, env=umgebung)
     cdp = None
     try:
         ziel = seite_finden(time.time() + 90, port)
         if not ziel:
             ergebnis['fehler_' + teil] = 'kinolel.de nicht geladen (90 s)'
             return
+        if maximiert:
+            time.sleep(2)
+            ergebnis['maximiert_' + teil] = fenster_maximieren(proc.pid)
+            time.sleep(2)
         cdp = Cdp(ziel['webSocketDebuggerUrl'])
         ereignisse = {'anfragen': [], 'navigation': [], 'konsole': [], 'aenderung': None, 'kinolel_js': 0}
 
@@ -483,7 +515,8 @@ def sitzung(teil, befehl, cwd, port, varianten, ergebnis):
 
         def abfangen(p):
             rid = p['requestId']
-            aenderung = ereignisse['aenderung']
+            url = p.get('request', {}).get('url', '')
+            aenderung = next((a for teil_url, a in (ereignisse['aenderung'] or {}).items() if teil_url in url), None)
             if aenderung is None:
                 cdp.senden('Fetch.continueRequest', requestId=rid)
                 return
@@ -492,7 +525,7 @@ def sitzung(teil, befehl, cwd, port, varianten, ergebnis):
             if koerper.get('base64Encoded'):
                 text = base64.b64decode(text).decode('utf-8', errors='replace')
             if aenderung == 'leer':
-                text = '/* KinoLel-Test: kinolel.js abgeschaltet */'
+                text = '/* KinoLel-Test: Skript abgeschaltet */'
             else:
                 for muster, ersatz in aenderung:
                     text, n = re.subn(muster, ersatz, text)
@@ -509,7 +542,7 @@ def sitzung(teil, befehl, cwd, port, varianten, ergebnis):
             cdp.rufe(d)
         cdp.rufe('Network.setCacheDisabled', cacheDisabled=False)
         cdp.rufe('Page.addScriptToEvaluateOnNewDocument', source=BEOBACHTER)
-        cdp.rufe('Fetch.enable', patterns=[{'urlPattern': '*/kinolel/kinolel.js*', 'requestStage': 'Response'}])
+        cdp.rufe('Fetch.enable', patterns=[{'urlPattern': m, 'requestStage': 'Response'} for m in ABFANGEN])
 
         # Anmelden (Bildschirmvideo der Anmeldung + ersten Startseite)
         aufnahme = Aufnahme(os.path.join(AUSGABE, f'{teil}-0-anmeldung.mp4'))
@@ -560,15 +593,26 @@ def main():
     if not PASSWORT:
         print('KINOLEL_TEST_PW fehlt (GitHub-Secret) - nur Trockenlauf bis zur Anmeldeseite')
     exe = os.path.join(APP_ORDNER, 'KinoLel.exe')
-    sitzung('app', [exe, '--desktop', '--windowed', f'--remote-debugging-port={PORT}', '--log-level', 'debug'], APP_ORDNER, PORT,
-            VARIANTEN, ergebnis)
-    for wurzel, _, dateien in os.walk(APP_ORDNER):
-        if 'KinoLel.log' in dateien:
-            with open(os.path.join(wurzel, 'KinoLel.log'), encoding='utf-8', errors='replace') as f:
-                text = f.read()
-            with open(os.path.join(AUSGABE, 'KinoLel.log'), 'w', encoding='utf-8') as f:
-                f.write(schwaerzen(text))
-            break
+    # Teile: (Name, Umgebung der App, Fenster maximieren, Varianten). Jeder Teil = eigener App-Start mit Anmeldung.
+    teile = [
+        ('app', {}, False, VARIANTEN),
+        ('app-maximiert', {}, True, VARIANTEN[:1]),
+        ('app-bildschicht-an', {'KINOLEL_WEB_LAYER': '1'}, False, VARIANTEN[:1]),
+        ('app-ohne-leistungsregeln', {'KINOLEL_LEISTUNG': '0'}, False, VARIANTEN[:1]),
+    ]
+    if os.environ.get('TEILE'):
+        gewuenscht = [t.strip() for t in os.environ['TEILE'].split(',')]
+        teile = [t for t in teile if t[0] in gewuenscht]
+    for name, env, maximiert, varianten in teile:
+        sitzung(name, [exe, '--desktop', '--windowed', f'--remote-debugging-port={PORT}', '--log-level', 'debug'], APP_ORDNER,
+                PORT, varianten, ergebnis, env=env, maximiert=maximiert)
+        for wurzel, _, dateien in os.walk(APP_ORDNER):
+            if 'KinoLel.log' in dateien:
+                with open(os.path.join(wurzel, 'KinoLel.log'), encoding='utf-8', errors='replace') as f:
+                    text = f.read()
+                with open(os.path.join(AUSGABE, f'{name}-KinoLel.log'), 'w', encoding='utf-8') as f:
+                    f.write(schwaerzen(text))
+                break
     # Vergleich: Google Chrome auf demselben Runner (Lel: „im Browser flüssig“)
     chrome = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
     if os.environ.get('CHROME_VERGLEICH', '1') == '1' and os.path.exists(chrome):
