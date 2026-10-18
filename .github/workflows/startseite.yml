@@ -48,6 +48,7 @@ jobs:
       timeout-minutes: 30
       env:
         KINOLEL_TEST_PW: ${{ secrets.KINOLEL_TEST_PW }}
+        BEOBACHTUNG: "60"   # Sekunden je Variante
       run: |
         python -m pip install --quiet psutil websocket-client imageio-ffmpeg
         python bundle/test/startseite.py app startseite
