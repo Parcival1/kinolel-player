@@ -46,6 +46,10 @@ VARIANTEN = [
     ('ohne-spracheNachLogin', {KJS: [(r'spracheNachLogin\(\);', '')]}),
     ('ohne-mediabar', {'MediaBar/slideshowpure.js': 'leer'}),
     ('ohne-jellyfin-enhanced', {'JellyfinEnhanced/script': 'leer'}),
+    # CSS-Versuche (nach dem Laden eingefügt) – mögliche Abhilfen
+    ('css-fortschritt-ohne-uebergang', {'__css__': '.spec-progress{transition:none!important}'}),
+    ('css-alles-statisch', {'__css__': '*,*::before,*::after{animation:none!important;transition:none!important}'}),
+    ('css-ohne-filter', {'__css__': '*,*::before,*::after{filter:none!important}'}),
 ]
 ABFANGEN = ['*/kinolel/kinolel.js*', '*/MediaBar/slideshowpure.js*', '*/JellyfinEnhanced/script*']
 if os.environ.get('VARIANTEN'):
@@ -114,6 +118,21 @@ BEOBACHTER = r"""
   addEventListener('hashchange', function () { B.verlauf.push([zeit(), 'hashchange', location.hash.slice(0, 120)]); });
   addEventListener('beforeunload', function () { B.verlauf.push([zeit(), 'beforeunload', '']); });
   addEventListener('error', function (e) { if (B.fehler.length < 50) B.fehler.push([zeit(), String(e.message || (e.target && e.target.src) || e.type).slice(0, 200)]); }, true);
+  // Wer ruft requestAnimationFrame / setTimeout / setInterval auf? (Quelle = erste Stack-Zeile außerhalb dieses Skripts)
+  B.raf = {}; B.timeout = {}; B.interval = {};
+  function quelle() {
+    var s = (new Error().stack || '').split('\n');
+    for (var i = 2; i < s.length; i++) {
+      if (s[i].indexOf('__klQ') >= 0) continue;
+      return s[i].trim().replace(/^at /, '').replace(/\?[^:)\s]*/g, '').slice(0, 150);
+    }
+    return '?';
+  }
+  function merke(m, q) { if (!(q in m) && Object.keys(m).length > 300) q = '(weitere)'; m[q] = (m[q] || 0) + 1; }
+  var oRaf = window.requestAnimationFrame, oTo = window.setTimeout, oIv = window.setInterval;
+  window.requestAnimationFrame = function __klQraf(cb) { merke(B.raf, quelle()); return oRaf.call(window, cb); };
+  window.setTimeout = function __klQto(cb, ms) { merke(B.timeout, quelle() + ' [' + (ms | 0) + ' ms]'); return oTo.apply(window, arguments); };
+  window.setInterval = function __klQiv(cb, ms) { merke(B.interval, quelle() + ' [' + (ms | 0) + ' ms]'); return oIv.apply(window, arguments); };
   // Media Bar: Aufrufe von slideshowPure.bootstrap() zählen
   var t = setInterval(function () {
     var sp = window.slideshowPure;
@@ -141,6 +160,48 @@ ZUSTAND = r"""
     culture: document.documentElement.getAttribute('data-culture') };
 })()
 """
+
+ANIMATIONEN = r"""
+(function () {
+  function name(e) {
+    if (!e || e.nodeType !== 1) return '?';
+    var n = e.tagName.toLowerCase();
+    if (e.id) n += '#' + e.id;
+    var k = (typeof e.className === 'string' ? e.className : '').trim().split(/\s+/).filter(Boolean).slice(0, 3);
+    if (k.length) n += '.' + k.join('.');
+    return n.slice(0, 80);
+  }
+  var g = {};
+  document.getAnimations().forEach(function (a) {
+    if (a.playState !== 'running') return;
+    var t = a.effect && a.effect.target, timing = a.effect && a.effect.getTiming ? a.effect.getTiming() : {};
+    var sichtbar = false;
+    try { var r = t.getBoundingClientRect(); sichtbar = r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight; } catch (e) { /* egal */ }
+    var k = (a.animationName ? 'animation ' + a.animationName : a.transitionProperty ? 'transition ' + a.transitionProperty : a.constructor.name) +
+      ' | ' + name(t) + ' | ' + (timing.iterations === Infinity ? 'endlos' : timing.iterations) + ' | ' + (sichtbar ? 'sichtbar' : 'unsichtbar');
+    g[k] = (g[k] || 0) + 1;
+  });
+  return Object.keys(g).map(function (k) { return [k, g[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 40);
+})()
+"""
+
+ZAEHLER = "(function(){var B=window.__klBeob;return B?JSON.stringify({raf:B.raf,timeout:B.timeout,interval:B.interval}):null})()"
+
+
+def zaehler_differenz(vorher, nachher, dauer):
+    """Aufrufe je Quelle im Beobachtungszeitraum, je Sekunde, absteigend"""
+    try:
+        a, b = json.loads(vorher or '{}'), json.loads(nachher or '{}')
+    except Exception:  # noqa: BLE001
+        return {}
+    erg = {}
+    for art in ('raf', 'timeout', 'interval'):
+        x, y = a.get(art, {}), b.get(art, {})
+        d = [(k, round((n - x.get(k, 0)) / dauer, 2)) for k, n in y.items() if n - x.get(k, 0) > 0]
+        erg[art] = sorted(d, key=lambda z: -z[1])[:15]
+        erg[art + '_pro_s'] = round(sum(n for _, n in d), 1)
+    return erg
+
 
 ZIELE = "(function(){var B=window.__klBeob;if(!B)return null;return Object.keys(B.ziele).map(function(k){return [k,B.ziele[k]]}).sort(function(a,b){return b[1]-a[1]}).slice(0,40)})()"
 
@@ -241,6 +302,22 @@ def cpu_sekunden(wurzel):
         except psutil.NoSuchProcess:
             pass
     return summe
+
+
+def cpu_je_art(wurzel):
+    """CPU-Sekunden je Prozessart: app (KinoLel.exe/chrome Hauptprozess), gpu-process, renderer, sonstige"""
+    erg = {}
+    for p in prozesse(wurzel):
+        try:
+            cmd = ' '.join(p.cmdline())
+            art = 'app' if p.pid == wurzel else (re.search(r'--type=([a-z-]+)', cmd) or [None, 'sonstige'])[1]
+            if art == 'utility' and 'network' in cmd.lower():
+                art = 'utility-netzwerk'
+            t = p.cpu_times()
+            erg[art] = erg.get(art, 0) + t.user + t.system
+        except Exception:  # noqa: BLE001
+            pass
+    return erg
 
 
 def seite_finden(frist, port):
@@ -375,19 +452,35 @@ def beobachten(cdp, proc, nr, name, aenderung, ereignisse):
     ereignisse['navigation'] = []
     ereignisse['konsole'] = []
     ereignisse['kinolel_js'] = 0
+    alt_t0 = cdp.js('window.__klBeob ? window.__klBeob.t0 : 0')
     cdp.rufe('Page.reload', ignoreCache=True)
     t_reload = time.time()
-    bereit = warten(cdp, STARTSEITE_BEREIT, time.time() + 60)
+    warten(cdp, 'window.__klBeob && window.__klBeob.t0 !== %d' % (alt_t0 or 0), time.time() + 30)
+    bereit = warten(cdp, STARTSEITE_BEREIT + " && !document.getElementById('kinolel-lade')", time.time() + 90)
     v['startseite_nach_s'] = round(time.time() - t_reload, 1) if bereit else None
     if not bereit:
-        v['fehler'] = 'Startseite nach Neuladen nicht bereit (60 s)'
-    time.sleep(2)
+        v['fehler'] = 'Startseite nach Neuladen nicht bereit (90 s)'
+    if (aenderung or {}).get('__css__'):
+        cdp.js("(function(){var s=document.createElement('style');s.id='kl-test-css';s.textContent=%s;"
+               "document.head.appendChild(s);return true})()" % json.dumps(aenderung['__css__']))
+    time.sleep(8)  # Nachladen der Reihen abwarten, dann ruhige Startseite messen
     video = os.path.join(AUSGABE, f'{nr}-{name}.mp4')
     aufnahme = Aufnahme(video)
     ereignisse['anfragen'] = []  # nur der Beobachtungszeitraum zählt
     ereignisse['navigation'] = []
     nav_vorher = len(ereignisse['navigation'])
     start_js = cdp.js('Date.now()')
+    zaehler0 = cdp.js(ZAEHLER)
+    leistung0 = {m['name']: m['value'] for m in cdp.rufe('Performance.getMetrics').get('metrics', [])}
+    ereignisse['bilder'] = 0
+    ereignisse['paints'] = {}
+    ereignisse['ebenen'] = []
+    try:
+        cdp.rufe('LayerTree.enable', zeit=20)
+    except Exception:  # noqa: BLE001
+        pass
+    cdp.rufe('Page.startScreencast', format='jpeg', quality=10, maxWidth=160, maxHeight=90, everyNthFrame=1)
+    art0 = cpu_je_art(proc.pid)
     c0, t0 = cpu_sekunden(proc.pid), time.time()
     bilder = []
     while time.time() - t0 < BEOBACHTUNG:
@@ -401,6 +494,40 @@ def beobachten(cdp, proc, nr, name, aenderung, ereignisse):
                     f.write(base64.b64decode(daten))
     dauer = time.time() - t0
     v['cpu_prozent'] = round((cpu_sekunden(proc.pid) - c0) / dauer * 100, 1)
+    art1 = cpu_je_art(proc.pid)
+    v['cpu_je_prozess'] = {k: round((art1.get(k, 0) - art0.get(k, 0)) / dauer * 100, 1) for k in art1}
+    cdp.rufe('Page.stopScreencast')
+    v['seitenbilder_pro_s'] = round(ereignisse['bilder'] / dauer, 1)
+    try:
+        cdp.rufe('LayerTree.disable', zeit=20)
+    except Exception:  # noqa: BLE001
+        pass
+    v['ebenen_neu_gezeichnet_pro_s'] = round(sum(ereignisse['paints'].values()) / dauer, 1)
+    ebenen = {e.get('layerId'): e for e in ereignisse['ebenen']}
+    oft = sorted(ereignisse['paints'].items(), key=lambda x: -x[1])[:8]
+    liste = []
+    for lid, n in oft:
+        e = ebenen.get(lid, {})
+        knoten = '?'
+        if e.get('backendNodeId'):
+            try:
+                d = cdp.rufe('DOM.describeNode', zeit=10, backendNodeId=e['backendNodeId']).get('node', {})
+                attr = d.get('attributes', [])
+                a = dict(zip(attr[::2], attr[1::2]))
+                knoten = (d.get('localName') or d.get('nodeName', '?')) + ('#' + a['id'] if a.get('id') else '') + \
+                    ('.' + '.'.join(a.get('class', '').split()[:3]) if a.get('class') else '')
+            except Exception:  # noqa: BLE001
+                pass
+        liste.append([round(n / dauer, 1), knoten, round(e.get('width', 0)), round(e.get('height', 0))])
+    v['ebenen_oft_neu'] = liste
+    leistung1 = {m['name']: m['value'] for m in cdp.rufe('Performance.getMetrics').get('metrics', [])}
+    # Hauptthread der Seite: Anteil der Zeit (in %) für Aufgaben insgesamt, Skript, Stil, Layout; Anzahl je Sekunde
+    v['hauptthread'] = {k: round((leistung1.get(k, 0) - leistung0.get(k, 0)) / dauer * 100, 1)
+                        for k in ('TaskDuration', 'ScriptDuration', 'RecalcStyleDuration', 'LayoutDuration')}
+    v['hauptthread'].update({k + '_pro_s': round((leistung1.get(k, 0) - leistung0.get(k, 0)) / dauer, 1)
+                             for k in ('RecalcStyleCount', 'LayoutCount')})
+    v['aufrufe'] = zaehler_differenz(zaehler0, cdp.js(ZAEHLER), dauer)
+    v['animationen'] = cdp.js(ANIMATIONEN) or []
     a = aufnahme.stop()
     if a:
         v['video'] = os.path.basename(video) if a[0] else None
@@ -477,7 +604,7 @@ def fenster_maximieren(pid):
     return len(gefunden)
 
 
-def sitzung(teil, befehl, cwd, port, varianten, ergebnis, env=None, maximiert=False):
+def sitzung(teil, befehl, cwd, port, varianten, ergebnis, env=None, maximiert=False, abmelden=True):
     """Programm (KinoLel-App oder Chrome als Vergleich) starten, anmelden, Varianten beobachten, abmelden."""
     umgebung = dict(os.environ)
     umgebung.update(env or {})
@@ -510,13 +637,22 @@ def sitzung(teil, befehl, cwd, port, varianten, ergebnis, env=None, maximiert=Fa
                 if len(ereignisse['konsole']) < 200:
                     text = ' '.join(str(a.get('value', a.get('description', '')))[:200] for a in p.get('args', []))
                     ereignisse['konsole'].append((p.get('type'), schwaerzen(text)[:300]))
+            elif methode == 'Page.screencastFrame':
+                ereignisse['bilder'] = ereignisse.get('bilder', 0) + 1
+                cdp.senden('Page.screencastFrameAck', sessionId=p.get('sessionId'))
+            elif methode == 'LayerTree.layerPainted':
+                lid = p.get('layerId')
+                ereignisse.setdefault('paints', {})[lid] = ereignisse.get('paints', {}).get(lid, 0) + 1
+            elif methode == 'LayerTree.layerTreeDidChange':
+                if p.get('layers'):
+                    ereignisse['ebenen'] = p['layers']
             elif methode == 'Fetch.requestPaused':
                 threading.Thread(target=abfangen, args=(p,), daemon=True).start()
 
         def abfangen(p):
             rid = p['requestId']
             url = p.get('request', {}).get('url', '')
-            aenderung = next((a for teil_url, a in (ereignisse['aenderung'] or {}).items() if teil_url in url), None)
+            aenderung = next((a for teil_url, a in (ereignisse['aenderung'] or {}).items() if teil_url != '__css__' and teil_url in url), None)
             if aenderung is None:
                 cdp.senden('Fetch.continueRequest', requestId=rid)
                 return
@@ -538,7 +674,7 @@ def sitzung(teil, befehl, cwd, port, varianten, ergebnis, env=None, maximiert=Fa
                        body=base64.b64encode(text.encode('utf-8')).decode())
 
         cdp.ereignis_rueckrufe.append(bei_ereignis)
-        for d in ('Network.enable', 'Page.enable', 'Runtime.enable'):
+        for d in ('Network.enable', 'Page.enable', 'Runtime.enable', 'Performance.enable'):
             cdp.rufe(d)
         cdp.rufe('Network.setCacheDisabled', cacheDisabled=False)
         cdp.rufe('Page.addScriptToEvaluateOnNewDocument', source=BEOBACHTER)
@@ -573,7 +709,7 @@ def sitzung(teil, befehl, cwd, port, varianten, ergebnis, env=None, maximiert=Fa
     except Exception as e:  # noqa: BLE001
         ergebnis['fehler_' + teil] = schwaerzen(repr(e))
     finally:
-        if cdp and cdp.offen:
+        if abmelden and cdp and cdp.offen:
             try:  # Sitzung des Hilfskontos beenden (Zugangsschlüssel wird damit ungültig)
                 ergebnis['abgemeldet_' + teil] = cdp.js("(function(){var a=window.ApiClient;if(!a||!a.logout)return false;"
                                                 "return a.logout().then(function(){return true},function(){return false})})()", zeit=20)
@@ -603,9 +739,11 @@ def main():
     if os.environ.get('TEILE'):
         gewuenscht = [t.strip() for t in os.environ['TEILE'].split(',')]
         teile = [t for t in teile if t[0] in gewuenscht]
-    for name, env, maximiert, varianten in teile:
+    # Nur einmal anmelden und erst ganz am Ende abmelden: jedes Abmelden + Neustart erzeugt 401-Antworten, und mehr als 6 in
+    # 10 Min. sperren die Runner-Adresse (fail2ban npm-http-auth auf CT 104, 18.10. passiert).
+    for i, (name, env, maximiert, varianten) in enumerate(teile):
         sitzung(name, [exe, '--desktop', '--windowed', f'--remote-debugging-port={PORT}', '--log-level', 'debug'], APP_ORDNER,
-                PORT, varianten, ergebnis, env=env, maximiert=maximiert)
+                PORT, varianten, ergebnis, env=env, maximiert=maximiert, abmelden=(i == len(teile) - 1))
         for wurzel, _, dateien in os.walk(APP_ORDNER):
             if 'KinoLel.log' in dateien:
                 with open(os.path.join(wurzel, 'KinoLel.log'), encoding='utf-8', errors='replace') as f:
@@ -631,16 +769,28 @@ def bericht(ergebnis):
          f"Anmeldung bis Startseite: App {ergebnis.get('anmeldung_bis_startseite_s_app', '–')} s, "
          f"Chrome {ergebnis.get('anmeldung_bis_startseite_s_chrome', '–')} s. "
          f"Fehler: {'; '.join(f'{k}: {w}' for k, w in ergebnis.items() if k.startswith('fehler')) or 'keine'}", '',
-         '| Programm | Variante | Anfragen/s (max) | DOM-Mutationen/s | Knoten neu/s | Abschnitte neu | Seiten neu geladen | bootstrap() | CPU % | Blitzer / Bildwechsel (Video) | Fehler |',
-         '|---|---|---|---|---|---|---|---|---|---|---|']
+         '| Programm | Variante | Anfragen/s (max) | DOM-Mutationen/s | Knoten neu/s | Abschnitte neu | Seiten neu geladen | bootstrap() | CPU % | Hauptthread % (Stil/Layout) | rAF/s | Seitenbilder/s | Ebenen-Neuzeichnen/s | Blitzer / Bildwechsel (Video) | Fehler |',
+         '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     for v in ergebnis['varianten']:
         z.append(f"| {v.get('teil')} | {v['variante']} | {v.get('anfragen_pro_s')} ({v.get('anfragen_max_pro_s')}) | {v.get('dom_mutationen_pro_s')} | "
                  f"{v.get('knoten_eingefuegt_pro_s')} | {v.get('abschnitte_neu')} | {v.get('seiten_neu_geladen')} | "
                  f"{v.get('bootstrap_aufrufe_gesamt')} | {v.get('cpu_prozent')} | "
+                 f"{(v.get('hauptthread') or {}).get('TaskDuration', '–')} ({(v.get('hauptthread') or {}).get('RecalcStyleDuration', '–')}/"
+                 f"{(v.get('hauptthread') or {}).get('LayoutDuration', '–')}) | {(v.get('aufrufe') or {}).get('raf_pro_s', '–')} | "
+                 f"{v.get('seitenbilder_pro_s', '–')} | {v.get('ebenen_neu_gezeichnet_pro_s', '–')} | "
                  f"{(v.get('flackern') or {}).get('blitzer', '–')} / {(v.get('flackern') or {}).get('grosse_wechsel', '–')} | {v.get('fehler', '')} |")
     for v in ergebnis['varianten'][:1]:
         z += ['', f"Häufigste Anfragen ({v['variante']}):", '']
         z += [f'- {n}× {k}' for k, n in v.get('top_anfragen', [])[:12]]
+        z += ['', f"CPU je Prozess ({v['variante']}): {v.get('cpu_je_prozess')}", '',
+              f"Am häufigsten neu gezeichnete Ebenen ({v['variante']}, je s / Element / Größe):", '']
+        z += [f'- {x[0]}/s {x[1]} ({x[2]}×{x[3]})' for x in v.get('ebenen_oft_neu', [])]
+        z += ['', f"Laufende Animationen am Ende ({v['variante']}):", '']
+        z += [f'- {n}× {k}' for k, n in v.get('animationen', [])[:15]]
+        z += ['', f"requestAnimationFrame je Sekunde nach Quelle ({v['variante']}):", '']
+        z += [f'- {n}/s {k}' for k, n in (v.get('aufrufe') or {}).get('raf', [])[:8]]
+        z += ['', f"setTimeout je Sekunde nach Quelle ({v['variante']}):", '']
+        z += [f'- {n}/s {k}' for k, n in (v.get('aufrufe') or {}).get('timeout', [])[:8]]
         z += ['', f"Häufigste DOM-Änderungen ({v['variante']}):", '']
         z += [f'- {n}× {k}' for k, n in v.get('top_mutationsziele', [])[:12]]
     text = '\n'.join(z) + '\n'
