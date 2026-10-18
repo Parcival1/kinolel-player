@@ -50,6 +50,7 @@ VARIANTEN = [
     ('css-fortschritt-ohne-uebergang', {'__css__': '.spec-progress{transition:none!important}'}),
     ('css-alles-statisch', {'__css__': '*,*::before,*::after{animation:none!important;transition:none!important}'}),
     ('css-ohne-filter', {'__css__': '*,*::before,*::after{filter:none!important}'}),
+    ('css-ohne-fortschrittsleiste', {'__css__': '.spec-rail,.spec-progress{display:none!important}'}),
 ]
 ABFANGEN = ['*/kinolel/kinolel.js*', '*/MediaBar/slideshowpure.js*', '*/JellyfinEnhanced/script*']
 if os.environ.get('VARIANTEN'):
@@ -736,6 +737,8 @@ def main():
         ('app-bildschicht-an', {'KINOLEL_WEB_LAYER': '1'}, False, VARIANTEN[:1]),
         ('app-ohne-leistungsregeln', {'KINOLEL_LEISTUNG': '0'}, False, VARIANTEN[:1]),
     ]
+    if os.environ.get('VARIANTEN'):  # gewählte Varianten in allen Teilen
+        teile = [(n, e, m, VARIANTEN) for n, e, m, _ in teile]
     if os.environ.get('TEILE'):
         gewuenscht = [t.strip() for t in os.environ['TEILE'].split(',')]
         teile = [t for t in teile if t[0] in gewuenscht]

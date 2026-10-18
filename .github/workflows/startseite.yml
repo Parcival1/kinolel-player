@@ -49,6 +49,10 @@ jobs:
       env:
         KINOLEL_TEST_PW: ${{ secrets.KINOLEL_TEST_PW }}
         BEOBACHTUNG: "45"   # Sekunden je Variante
+        # Auswahl (leer = alle): Varianten/Teile aus bundle/test/startseite.py, Chrome-Vergleich 1/0
+        VARIANTEN: "original,css-ohne-fortschrittsleiste,css-alles-statisch"
+        TEILE: "app,app-maximiert"
+        CHROME_VERGLEICH: "0"
       run: |
         python -m pip install --quiet psutil websocket-client imageio-ffmpeg
         python bundle/test/startseite.py app startseite
