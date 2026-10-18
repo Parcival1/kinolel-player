@@ -609,6 +609,10 @@ window.jmpInfo.settingsUpdate.push(function(section) {
         '.spec-progress{transition-timing-function:steps(24,end)!important}';
     if (jmpInfo.softwareRendering) {
         stil += '*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}';
+        // Lel 17.10. „flackert konstant“: Die Fortschrittsleiste des Karussells lässt die ganze Seite 2× pro Sekunde
+        // neu zeichnen (ohne GPU 66 % statt 24 % CPU, maximiert 97 % statt 39 %; bundle/test/startseite.py) -> ohne GPU
+        // ausblenden. Die Punkte unter dem Karussell zeigen weiter, welcher Titel gerade läuft.
+        stil += '.spec-rail,.spec-progress{display:none!important}';
     }
     const einfuegen = () => {
         if (document.getElementById('kinolel-app-leistung')) return;
