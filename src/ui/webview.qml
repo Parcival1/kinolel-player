@@ -16,7 +16,8 @@ Window
   minimumWidth: 213
   minimumHeight: 120
   visible: true
-  color: "#000000"
+  // KinoLel: Grundfarbe von kinolel.de statt Schwarz (sichtbar beim Start, Größe ändern, kurzen Lücken der Webansicht)
+  color: kinolelHintergrund
 
   // Properties previously from KonvergoWindow
   property bool webDesktopMode: true

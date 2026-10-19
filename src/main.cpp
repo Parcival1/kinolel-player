@@ -502,15 +502,14 @@ int main(int argc, char *argv[])
     // load QtWebChannel so that we can register our components with it.
     QQmlApplicationEngine *engine = Globals::Engine();
 
-    // KinoLel: Die Web-Bildschicht (layer.enabled) ist ein Linux-Workaround gegen schwarze Bilder und kostet
-    // in jedem Bild einen zusätzlichen Vollbild-Durchgang. Unter Windows/macOS aus; KINOLEL_WEB_LAYER=1/0 überschreibt.
-    bool webLayer = false;
-#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
-    webLayer = true;
-#endif
+    // KinoLel: Die Web-Bildschicht (layer.enabled) verhindert laut Jellyfin Desktop schwarze Bilder („intermittent black
+    // screens“). v0.1.1–v0.1.3 hatten sie unter Windows aus (spart ohne GPU viel CPU); Lel 19.10.: auf dem PC mit GPU
+    // flackert es -> wieder an wie im Original, nur ohne GPU (Software-OpenGL) aus. KINOLEL_WEB_LAYER=1/0 überschreibt.
+    bool webLayer = !SystemComponent::Get().softwareGrafik();
     if (qEnvironmentVariableIsSet("KINOLEL_WEB_LAYER"))
       webLayer = qEnvironmentVariable("KINOLEL_WEB_LAYER") == "1";
     Globals::SetContextProperty("kinolelWebLayer", webLayer);
+    Globals::SetContextProperty("kinolelHintergrund", Names::AppHintergrund());
 
     Globals::SetContextProperty("components", &ComponentManager::Get().getQmlPropertyMap());
 

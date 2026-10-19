@@ -39,3 +39,8 @@ QString Names::UpdateRepo()
 {
   return QString("@APP_UPDATE_REPO@");
 }
+
+QString Names::AppHintergrund()
+{
+  return QString("@APP_COLOR_BACKGROUND@");
+}

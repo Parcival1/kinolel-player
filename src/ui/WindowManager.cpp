@@ -18,6 +18,37 @@
 
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
+#include <QColor>
+#include "shared/Names.h"
+
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
+
+// KinoLel (Lel 19.10.: „oberen Rand und alle anderen Ränder in dasselbe Blau wie das restliche Jellyfin“):
+// Titelleiste, Fensterrand und Titeltext in der Grundfarbe von kinolel.de. Die Windows-Knöpfe (Minimieren,
+// Maximieren, Schließen), Andocken und Snap-Layouts bleiben unverändert. Farben: Windows 11 (ab Build 22000);
+// Windows 10 bekommt nur die dunkle Titelleiste. Nummern statt Namen, damit auch ältere SDKs bauen.
+static void kinolelFensterfarbe(QWindow* fenster)
+{
+  if (!fenster)
+    return;
+  HWND hwnd = reinterpret_cast<HWND>(fenster->winId());
+  const BOOL dunkel = TRUE;
+  DwmSetWindowAttribute(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dunkel, sizeof(dunkel));
+  const QColor grund(Names::AppHintergrund());
+  const COLORREF farbe = RGB(grund.red(), grund.green(), grund.blue());
+  const COLORREF text = RGB(0xE8, 0xEA, 0xF0);
+  HRESULT ergebnis = DwmSetWindowAttribute(hwnd, 35 /* DWMWA_CAPTION_COLOR */, &farbe, sizeof(farbe));
+  DwmSetWindowAttribute(hwnd, 34 /* DWMWA_BORDER_COLOR */, &farbe, sizeof(farbe));
+  DwmSetWindowAttribute(hwnd, 36 /* DWMWA_TEXT_COLOR */, &text, sizeof(text));
+  qInfo() << "KinoLel-Fenster: Titelleiste" << grund.name() << (SUCCEEDED(ergebnis) ? "gesetzt" : "nicht möglich (vor Windows 11: nur dunkel)");
+}
+#endif
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +115,10 @@ void WindowManager::initializeWindow(QQuickWindow* window)
 
   // Apply initial settings
   applySettings();
+
+#ifdef Q_OS_WIN
+  kinolelFensterfarbe(m_window);
+#endif
 
   // Setup screen management
   updateScreens();

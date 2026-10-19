@@ -25,7 +25,8 @@ Ohne Installation: `KinoLel-Portable-<Version>-x64.zip` entpacken und `KinoLel.e
 | 9 | Vollbild | **F11** oder **Alt+Enter** schaltet um; im Film Doppelklick |
 | 10 | TV-Modus | Startmenü **KinoLel (TV-Modus)**: Vollbild, große TV-Oberfläche, Bedienung mit Pfeiltasten/Enter/Rücktaste oder Gamepad |
 | 11 | Medientasten | Wiedergabe/Pause/Weiter auf der Tastatur |
-| 12 | **Startseite ruhig** (v0.1.3) | Startseite 1 Minute stehen lassen: kein Flackern, nichts lädt dauernd neu; nur das Karussell wechselt alle 12 s den Titel. Auf PCs ohne Grafikkarte (z. B. VM) gibt es dort keine Fortschrittsleiste mehr – das spart viel Rechenleistung |
+| 12 | **Startseite ruhig** (v0.1.4) | Startseite 1–2 Minuten stehen lassen: **kein Flackern**, nichts lädt dauernd neu; nur das Karussell wechselt alle 12 s den Titel. Auf PCs ohne Grafikkarte (z. B. VM) gibt es dort keine Fortschrittsleiste |
+| 13 | **Fensterrahmen** (v0.1.4) | Titelleiste und Fensterrand im KinoLel-Dunkelblau statt Weiß/Grau (Windows 11; Windows 10: dunkel). Minimieren/Maximieren/Schließen oben rechts wie gewohnt |
 
 ## Wenn es ruckelt oder die Lüfter laufen (Diagnose, ab v0.1.1)
 

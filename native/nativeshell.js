@@ -604,9 +604,10 @@ window.jmpInfo.settingsUpdate.push(function(section) {
     try { server = new URL(jmpInfo.serverUrl).host; } catch (e) { return; }
     if (location.host !== server) return;
 
-    let stil =
-        '.backdrop.high-quality{animation:none!important}' +
-        '.spec-progress{transition-timing-function:steps(24,end)!important}';
+    // Ken-Burns-Zoom aus (v0.1.1). Die Stufen-Regel für den Fortschrittsbalken (steps(24), v0.1.1–v0.1.3) ist weg:
+    // Lel 19.10. flackert es auf dem PC mit GPU; stoßweise Bilder (2/s) lassen G-Sync/FreeSync-Monitore die
+    // Bildrate springen (bekanntes Flackern, jellyfin-desktop #1202/#1156). Mit GPU läuft der Balken wieder gleichmäßig.
+    let stil = '.backdrop.high-quality{animation:none!important}';
     if (jmpInfo.softwareRendering) {
         stil += '*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}';
         // Lel 17.10. „flackert konstant“: Die Fortschrittsleiste des Karussells lässt die ganze Seite 2× pro Sekunde

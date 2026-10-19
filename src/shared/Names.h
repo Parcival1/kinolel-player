@@ -17,6 +17,7 @@ namespace Names
   QString ServerUrl();
   QString AppUrl();
   QString UpdateRepo();
+  QString AppHintergrund();  // Grundfarbe (#rrggbb) für Fenster/Titelleiste
 };
 
 #endif //NAMES_H

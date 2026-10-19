@@ -492,7 +492,7 @@ QString SystemComponent::grafikInfo() const
   zeilen << QString("Web-Bildschicht (layer): %1").arg(Globals::ContextProperty("kinolelWebLayer").toBool() ? "an" : "aus");
   zeilen << QString("Chromium-Zusatzflags: %1").arg(qEnvironmentVariable("QTWEBENGINE_CHROMIUM_FLAGS", "-"));
   zeilen << QString("Leistungsregeln kinolel.de: %1").arg(qEnvironmentVariable("KINOLEL_LEISTUNG") == "0" ? "aus"
-                         : (software ? "an (Ken-Burns aus, Fortschritt in Stufen, Weichzeichner aus)" : "an (Ken-Burns aus, Fortschritt in Stufen)"));
+                         : (software ? "an (Ken-Burns aus, Weichzeichner aus, Fortschrittsleiste aus)" : "an (Ken-Burns aus)"));
   if (QScreen* bildschirm = QGuiApplication::primaryScreen())
     zeilen << QString("Bildschirm: %1x%2 @ %3 Hz, Skalierung %4")
                 .arg(bildschirm->size().width()).arg(bildschirm->size().height())
