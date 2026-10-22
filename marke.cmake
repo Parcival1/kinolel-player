@@ -20,7 +20,7 @@ set(APP_PUBLISHER "Lel")
 set(APP_URL "https://kinolel.de")
 
 # Version des Players (drei Zahlen; das MSIX-Paket hängt ".0" an). Bei jeder Verteilung erhöhen.
-set(APP_VERSION "0.1.5")
+set(APP_VERSION "0.1.6")
 
 # Technische Kennung ohne Leerzeichen/Umlaute (Dateinamen der Pakete, User-Agent)
 set(APP_ID "KinoLelPlayer")

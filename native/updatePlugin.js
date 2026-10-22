@@ -1,5 +1,6 @@
 // KinoLel: Auto-Update-Hinweis (ersetzt die Jellyfin-Desktop-Updateprüfung).
-// Die App (SystemKinoLelUpdate.cpp) prüft die GitHub-Releases; ist eine neuere Version da, fragt dieser Dialog nach.
+// Die App (SystemKinoLelUpdate.cpp) prüft bei jedem Start die Versionsliste auf kinolel.de (sonst GitHub-Releases);
+// ist eine neuere Version da, fragt dieser Dialog nach.
 // „Jetzt aktualisieren“ lädt den Installer, installiert still und startet KinoLel neu.
 (function() {
 class updatePlugin {
@@ -37,7 +38,18 @@ class updatePlugin {
                 anzeige.textContent = text;
             };
 
+            // „Später“ gilt 4 Stunden für dieselbe Version; nie zwei Hinweise übereinander (Lel 22.10.2026)
+            const SPAETER_MS = 4 * 3600 * 1000;
+            let hinweisOffen = false;
+            const spaeterGewaehlt = (version) => {
+                try {
+                    const s = JSON.parse(localStorage.getItem('kl-update-spaeter') || 'null');
+                    return !!(s && s.version === version && Date.now() - s.zeit < SPAETER_MS);
+                } catch (e) { return false; }
+            };
             api.system.kinolelUpdateVerfuegbar.connect(async (version, url, seite, einKlick) => {
+                if (hinweisOffen || spaeterGewaehlt(version)) return;
+                hinweisOffen = true;
                 try {
                     // kurz warten, damit die Startseite fertig ist
                     await new Promise(resolve => setTimeout(resolve, 3000));
@@ -55,8 +67,13 @@ class updatePlugin {
                     }
                 } catch (e) {
                     // „Später“
+                    try { localStorage.setItem('kl-update-spaeter', JSON.stringify({ version: version, zeit: Date.now() })); } catch (x) { /* egal */ }
+                } finally {
+                    hinweisOffen = false;
                 }
             });
+            // Solange KinoLel offen ist, alle 3 Stunden erneut nachsehen (beim Start prüft die App ohnehin)
+            setInterval(() => api.system.kinolelUpdatePruefen(false), 3 * 3600 * 1000);
             api.system.kinolelUpdateFortschritt.connect((prozent) => zeige(`${T.laedt} ${prozent} %`));
             api.system.kinolelUpdateFehler.connect((text) => {
                 zeige(T.fehler + text);
