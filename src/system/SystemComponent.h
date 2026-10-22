@@ -83,6 +83,9 @@ public:
   Q_SIGNAL void kinolelUpdateVerfuegbar(QString version, QString url, QString seite, bool einKlick);
   Q_SIGNAL void kinolelUpdateFortschritt(int prozent);
   Q_SIGNAL void kinolelUpdateFehler(QString text);
+  // KinoLel: einmal nach einem Update zeigen, was neu ist (native/neuigkeiten.json, Anzeige in updatePlugin.js)
+  Q_INVOKABLE QVariantList kinolelNeuigkeiten();
+  Q_INVOKABLE void kinolelNeuigkeitenGezeigt();
 
   // possible os types type enum
   enum PlatformType

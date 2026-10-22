@@ -127,6 +127,11 @@ jobs:
         python -m pip install --quiet psutil websocket-client
         python bundle/test/leistung.py build/portable leistung
       shell: pwsh
+    - name: Meldung „Neu in …“ (einmal nach einem Update)
+      continue-on-error: true
+      timeout-minutes: 10
+      run: python bundle/test/neuigkeiten_test.py build/portable leistung
+      shell: pwsh
     - name: Auto-Update-Test (installieren, als alte Version starten, aktualisieren)
       continue-on-error: true
       timeout-minutes: 15

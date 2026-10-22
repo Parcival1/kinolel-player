@@ -62,7 +62,73 @@ class updatePlugin {
                 zeige(T.fehler + text);
                 setTimeout(() => { if (anzeige) { anzeige.remove(); anzeige = null; } }, 8000);
             });
-            api.system.kinolelUpdatePruefen(false);
+
+            // KinoLel (Lel 22.10.2026): einmal nach einem Update zeigen, was neu ist (Texte: native/neuigkeiten.json)
+            const neuigkeitenZeigen = (liste) => {
+                if (document.getElementById('kl-neuigkeiten')) return;
+                const kultur = (document.documentElement.getAttribute('data-culture') || navigator.language || 'de').slice(0, 2).toLowerCase();
+                const sp = kultur === 'hu' ? 'hu' : (kultur === 'en' ? 'en' : 'de');
+                const version = (window.jmpInfo && window.jmpInfo.version || '').replace(/-.*$/, '');
+                const W = {
+                    de: { titel: `Neu in ${name} ${version}`, version: (v) => `Version ${v}`, ok: 'Alles klar' },
+                    hu: { titel: `Újdonságok – ${name} ${version}`, version: (v) => `${v}. verzió`, ok: 'Rendben' },
+                    en: { titel: `New in ${name} ${version}`, version: (v) => `Version ${v}`, ok: 'Got it' }
+                }[sp];
+                const huelle = document.createElement('div');
+                huelle.id = 'kl-neuigkeiten';
+                huelle.className = 'kl-neu';
+                huelle.style.cssText = 'position:fixed;inset:0;z-index:2147483645;display:flex;align-items:center;justify-content:center;' +
+                    'background:rgba(7,10,18,.72);font:16px "Segoe UI",sans-serif';
+                const karte = document.createElement('div');
+                karte.setAttribute('role', 'dialog');
+                karte.setAttribute('aria-modal', 'true');
+                karte.style.cssText = 'max-width:560px;width:calc(100% - 48px);max-height:80vh;overflow:auto;background:#151b2a;color:#fff;' +
+                    'border:1px solid #9aa4ff;border-radius:14px;padding:22px 26px;box-shadow:0 10px 40px rgba(0,0,0,.6)';
+                const h = document.createElement('h2');
+                h.textContent = W.titel;
+                h.style.cssText = 'margin:0 0 12px;font-size:1.35em;color:#9aa4ff';
+                karte.appendChild(h);
+                liste.forEach((eintrag) => {
+                    if (liste.length > 1) {
+                        const v = document.createElement('div');
+                        v.textContent = W.version(eintrag.version);
+                        v.style.cssText = 'font-weight:600;margin:12px 0 4px;opacity:.85';
+                        karte.appendChild(v);
+                    }
+                    const ul = document.createElement('ul');
+                    ul.style.cssText = 'margin:0;padding-left:1.2em;line-height:1.45';
+                    (eintrag[sp] || eintrag.de || []).forEach((punkt) => {
+                        const li = document.createElement('li');
+                        li.textContent = punkt;
+                        li.style.margin = '6px 0';
+                        ul.appendChild(li);
+                    });
+                    karte.appendChild(ul);
+                });
+                const knopf = document.createElement('button');
+                knopf.type = 'button';
+                knopf.className = 'kl-neu-ok';
+                knopf.textContent = W.ok;
+                knopf.style.cssText = 'display:block;margin:20px 0 0 auto;border:0;border-radius:999px;padding:10px 26px;' +
+                    'background:#9aa4ff;color:#0b0f18;font:600 15px "Segoe UI",sans-serif;cursor:pointer';
+                const schliessen = () => {
+                    huelle.remove();
+                    api.system.kinolelNeuigkeitenGezeigt();
+                };
+                knopf.addEventListener('click', schliessen);
+                huelle.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' || e.key === 'Enter' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); schliessen(); }
+                }, true);
+                karte.appendChild(knopf);
+                huelle.appendChild(karte);
+                document.body.appendChild(huelle);
+                knopf.focus();
+            };
+            // Zuerst die Neuigkeiten (die Update-Prüfung merkt sich ihren Zeitpunkt; davor gilt: noch nie benutzt = Neuinstallation)
+            api.system.kinolelNeuigkeiten((liste) => {
+                if (liste && liste.length) setTimeout(() => neuigkeitenZeigen(liste), 2500);
+                api.system.kinolelUpdatePruefen(false);
+            });
         })();
     }
 }

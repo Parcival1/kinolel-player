@@ -1,0 +1,31 @@
+{
+  "versionen": [
+    {
+      "version": "0.1.5",
+      "de": ["Nach jedem Update zeigt KinoLel jetzt einmal kurz, was neu ist – so wie hier."],
+      "hu": ["Minden frissítés után a KinoLel egyszer röviden megmutatja, mi az újdonság – mint most."],
+      "en": ["After every update, KinoLel now briefly shows once what's new – just like this."]
+    },
+    {
+      "version": "0.1.4",
+      "de": [
+        "Kein Flackern und keine schwarzen Bilder mehr auf der Startseite (PCs mit Grafikkarte).",
+        "Titelleiste und Fensterrand jetzt im KinoLel-Dunkelblau. Minimieren, Maximieren und Schließen bleiben wie gewohnt oben rechts."
+      ],
+      "hu": [
+        "Nincs többé villogás és fekete kép a kezdőoldalon (videókártyás gépeken).",
+        "A címsor és az ablakkeret most KinoLel-sötétkék. A kis méret, teljes méret és bezárás gombok a megszokott helyen, jobb felül vannak."
+      ],
+      "en": [
+        "No more flickering or black screens on the home page (PCs with a graphics card).",
+        "Title bar and window border are now KinoLel dark blue. Minimize, maximize and close stay at the top right as usual."
+      ]
+    },
+    {
+      "version": "0.1.3",
+      "de": ["Auf PCs ohne Grafikkarte läuft die Startseite deutlich ruhiger und braucht viel weniger Rechenleistung."],
+      "hu": ["Videókártya nélküli gépeken a kezdőoldal sokkal nyugodtabban fut, és jóval kevesebb erőforrást használ."],
+      "en": ["On PCs without a graphics card the home page runs much more smoothly and uses far less computing power."]
+    }
+  ]
+}

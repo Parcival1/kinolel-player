@@ -4,6 +4,7 @@
 // Gibt es eine neuere Version, zeigt die Weboberfläche einen Hinweis (native/updatePlugin.js). Mit einem Klick lädt die
 // App den Installer, startet ihn still (/SILENT) und beendet sich; der Installer startet KinoLel danach neu.
 // Portabel: nur Hinweis mit Link zur Release-Seite. MSIX (Microsoft Store): keine Prüfung, der Store aktualisiert.
+#include <algorithm>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
@@ -178,4 +179,61 @@ void SystemComponent::kinolelUpdateInstallieren(const QString& url, const QStrin
     qInfo() << "KinoLel-Update: Installer gestartet, beende App";
     QTimer::singleShot(500, qApp, &QCoreApplication::quit);
   });
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// KinoLel (Lel 22.10.2026): „Wenn es ein Update gab, einmalig nach der Aktualisierung eine Meldung, was geändert wurde oder
+// neu dazugekommen ist.“ Texte liegen in der App (native/neuigkeiten.json, je Version de/hu/en). Anzeige: native/updatePlugin.js.
+// Frisch installiert: nichts. Erste Version mit dieser Meldung nach einem Update: die zwei neuesten Einträge.
+// KINOLEL_TEST_NEUIGKEITEN_SEIT=<Version>: nur für den Test im Build (tut so, als sei diese Version zuletzt gesehen).
+QVariantList SystemComponent::kinolelNeuigkeiten()
+{
+  QSettings einstellungen;
+  const QVersionNumber aktuell = versionAus(Version::GetVersionString());
+  QString gesehenText = einstellungen.value("kinolel/neuigkeitenGesehen").toString();
+  if (qEnvironmentVariableIsSet("KINOLEL_TEST_NEUIGKEITEN_SEIT"))
+    gesehenText = qEnvironmentVariable("KINOLEL_TEST_NEUIGKEITEN_SEIT");
+  const QVersionNumber gesehen = versionAus(gesehenText);
+  if (!gesehenText.isEmpty() && QVersionNumber::compare(gesehen, aktuell) >= 0)
+    return {};
+
+  // Schon einmal benutzt (Update-Prüfung lief) = Update; sonst frische Installation -> merken, nichts zeigen
+  const bool aktualisiert = !gesehenText.isEmpty() || einstellungen.contains("kinolel/updateZuletzt");
+  if (!aktualisiert)
+  {
+    einstellungen.setValue("kinolel/neuigkeitenGesehen", aktuell.toString());
+    return {};
+  }
+
+  QFile datei(":/web-client/extension/neuigkeiten.json");
+  if (!datei.open(QIODevice::ReadOnly))
+    return {};
+  const QJsonArray versionen = QJsonDocument::fromJson(datei.readAll()).object().value("versionen").toArray();
+  QList<QPair<QVersionNumber, QVariantMap>> eintraege;
+  for (const QJsonValue& wert : versionen)
+  {
+    const QJsonObject eintrag = wert.toObject();
+    const QVersionNumber v = versionAus(eintrag.value("version").toString());
+    if (QVersionNumber::compare(v, aktuell) > 0)
+      continue;
+    if (!gesehenText.isEmpty() && QVersionNumber::compare(v, gesehen) <= 0)
+      continue;
+    eintraege.append({v, eintrag.toVariantMap()});
+  }
+  std::sort(eintraege.begin(), eintraege.end(), [](const auto& a, const auto& b) { return QVersionNumber::compare(a.first, b.first) > 0; });
+  if (gesehenText.isEmpty() && eintraege.size() > 2)
+    eintraege = eintraege.mid(0, 2);
+
+  QVariantList liste;
+  for (const auto& e : eintraege)
+    liste.append(e.second);
+  qInfo() << "KinoLel-Neuigkeiten:" << liste.size() << "Einträge seit" << (gesehenText.isEmpty() ? QString("?") : gesehenText);
+  return liste;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void SystemComponent::kinolelNeuigkeitenGezeigt()
+{
+  QSettings einstellungen;
+  einstellungen.setValue("kinolel/neuigkeitenGesehen", versionAus(Version::GetVersionString()).toString());
 }
