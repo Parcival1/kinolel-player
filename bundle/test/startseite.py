@@ -459,6 +459,9 @@ def beobachten(cdp, proc, nr, name, aenderung, ereignisse):
     warten(cdp, 'window.__klBeob && window.__klBeob.t0 !== %d' % (alt_t0 or 0), time.time() + 30)
     bereit = warten(cdp, STARTSEITE_BEREIT + " && !document.getElementById('kinolel-lade')", time.time() + 90)
     v['startseite_nach_s'] = round(time.time() - t_reload, 1) if bereit else None
+    # Lade-Overlay von kinolel.de (lade-overlay.html) merkt sich, nach wie vielen ms es weg war
+    lz = cdp.js('window.kinolelLadezeit || 0')
+    v['ladekreis_weg_s'] = round(lz / 1000, 1) if lz else None
     if not bereit:
         v['fehler'] = 'Startseite nach Neuladen nicht bereit (90 s)'
     if (aenderung or {}).get('__css__'):
@@ -775,7 +778,7 @@ def bericht(ergebnis):
          '| Programm | Variante | Anfragen/s (max) | DOM-Mutationen/s | Knoten neu/s | Abschnitte neu | Seiten neu geladen | bootstrap() | CPU % | Hauptthread % (Stil/Layout) | rAF/s | Seitenbilder/s | Ebenen-Neuzeichnen/s | Blitzer / Bildwechsel (Video) | Fehler |',
          '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     for v in ergebnis['varianten']:
-        z.append(f"| {v.get('teil')} | {v['variante']} | {v.get('anfragen_pro_s')} ({v.get('anfragen_max_pro_s')}) | {v.get('dom_mutationen_pro_s')} | "
+        z.append(f"| {v.get('teil')} | {v['variante']} (Ladekreis weg nach {v.get('ladekreis_weg_s') or '–'} s) | {v.get('anfragen_pro_s')} ({v.get('anfragen_max_pro_s')}) | {v.get('dom_mutationen_pro_s')} | "
                  f"{v.get('knoten_eingefuegt_pro_s')} | {v.get('abschnitte_neu')} | {v.get('seiten_neu_geladen')} | "
                  f"{v.get('bootstrap_aufrufe_gesamt')} | {v.get('cpu_prozent')} | "
                  f"{(v.get('hauptthread') or {}).get('TaskDuration', '–')} ({(v.get('hauptthread') or {}).get('RecalcStyleDuration', '–')}/"
