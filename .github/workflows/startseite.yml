@@ -50,7 +50,8 @@ jobs:
         KINOLEL_TEST_PW: ${{ secrets.KINOLEL_TEST_PW }}
         BEOBACHTUNG: "45"   # Sekunden je Variante
         # Auswahl (leer = alle): Varianten/Teile aus bundle/test/startseite.py, Chrome-Vergleich 1/0
-        VARIANTEN: "original,css-ohne-fortschrittsleiste,css-alles-statisch"
+        # (23.10.) nur noch die unveränderte Seite – die CSS-Varianten dienten der Flacker-Suche (17.10.), bei Bedarf wieder eintragen
+        VARIANTEN: "original"
         TEILE: "app,app-maximiert"
         CHROME_VERGLEICH: "0"
       run: |
