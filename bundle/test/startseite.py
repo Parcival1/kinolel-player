@@ -462,6 +462,8 @@ def beobachten(cdp, proc, nr, name, aenderung, ereignisse):
     # Lade-Overlay von kinolel.de (lade-overlay.html) merkt sich, nach wie vielen ms es weg war
     lz = cdp.js('window.kinolelLadezeit || 0')
     v['ladekreis_weg_s'] = round(lz / 1000, 1) if lz else None
+    # worauf das Overlay jeweils gewartet hat: [[ms, Grund], ...] (lade-overlay.html, seit 23.10.)
+    v['ladeprotokoll'] = cdp.js('JSON.stringify(window.kinolelLadeProtokoll || [])')
     if not bereit:
         v['fehler'] = 'Startseite nach Neuladen nicht bereit (90 s)'
     if (aenderung or {}).get('__css__'):
@@ -785,6 +787,8 @@ def bericht(ergebnis):
                  f"{(v.get('hauptthread') or {}).get('LayoutDuration', '–')}) | {(v.get('aufrufe') or {}).get('raf_pro_s', '–')} | "
                  f"{v.get('seitenbilder_pro_s', '–')} | {v.get('ebenen_neu_gezeichnet_pro_s', '–')} | "
                  f"{(v.get('flackern') or {}).get('blitzer', '–')} / {(v.get('flackern') or {}).get('grosse_wechsel', '–')} | {v.get('fehler', '')} |")
+    z += ['', 'Worauf der Ladekreis gewartet hat ([ms, Grund], lade-overlay.html):', '']
+    z += [f"- {v.get('teil')} / {v['variante']}: {v.get('ladeprotokoll')}" for v in ergebnis['varianten']]
     for v in ergebnis['varianten'][:1]:
         z += ['', f"Häufigste Anfragen ({v['variante']}):", '']
         z += [f'- {n}× {k}' for k, n in v.get('top_anfragen', [])[:12]]
