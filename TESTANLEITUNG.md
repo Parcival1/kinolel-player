@@ -52,3 +52,5 @@ Das spätere Store-Paket lässt sich vorab ausprobieren (braucht einmal Administ
    Speicher **Vertrauenswürdige Personen**.
 2. `KinoLel-Test-<Version>.0-x64.msix` doppelklicken → Installieren.
 3. Vorher die Setup-Version deinstallieren, damit klar ist, welche läuft. Jeder neue Build hat ein neues Testzertifikat.
+
+_Server-Stand der letzten automatischen Prüfung: Jellyfin 12.3.0 (23.10.2026)._
