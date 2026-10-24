@@ -1,0 +1,44 @@
+# KinoLel Windows-Neubau (Lel 24.10.2026): Prüfung, ob jellyfin-desktop v1.12.0 (offizielles Windows-Release) die heutige
+# kinolel.de-Seite trägt – Chromium-Version, fehlende Funktionen, JS-Fehler, Schauspielerbilder. Nur auf Zweig pruefung-112.
+name: pruefung-112
+
+on:
+  push:
+    branches:
+      - pruefung-112
+
+permissions:
+  contents: read
+
+jobs:
+  pruefung:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v7
+    - name: Jellyfin Media Player 1.12.0 (offizielles Release) still installieren
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh release download v1.12.0 --repo jellyfin/jellyfin-desktop --pattern "JellyfinMediaPlayer-1.12.0-windows-x64.exe" --dir inst
+        $setup = (Get-ChildItem inst -Filter *.exe | Select-Object -First 1).FullName
+        Start-Process -Wait -FilePath $setup -ArgumentList "/quiet","/norestart"
+        $exe = Get-ChildItem "C:\Program Files" -Recurse -Filter JellyfinMediaPlayer.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+        Write-Host "Installiert: $($exe.FullName) $($exe.VersionInfo.FileVersion)"
+        Get-ChildItem $exe.DirectoryName -Filter "Qt5WebEngineCore.dll" | ForEach-Object { Write-Host "QtWebEngine: $($_.VersionInfo.FileVersion)" }
+        "JMP_EXE=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      shell: pwsh
+    - name: Prüfung mit kinolel.de
+      env:
+        KINOLEL_TEST_PW: ${{ secrets.KINOLEL_TEST_PW }}
+      run: |
+        python -m pip install --quiet psutil websocket-client
+        python bundle/test/pruefung_112.py "$env:JMP_EXE" pruefung
+      shell: pwsh
+    - name: Ergebnis sichern
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: pruefung-112
+        path: pruefung/
+        retention-days: 3
