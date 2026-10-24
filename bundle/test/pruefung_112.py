@@ -26,6 +26,15 @@ TESTFILM = "Zurück in die Zukunft II"
 ergebnis = {"fehler_js": [], "konsole": []}
 
 
+def desktop(name):
+    """Bildschirmfoto des ganzen Windows-Desktops (zeigt auch Dialoge außerhalb der Webseite)."""
+    try:
+        from PIL import ImageGrab
+        ImageGrab.grab().save(os.path.join(AUS, name + '.png'))
+    except Exception as e:  # noqa: BLE001
+        ergebnis.setdefault('desktop_fehler', repr(e)[:200])
+
+
 def bild(cdp, name):
     daten = cdp.rufe('Page.captureScreenshot', zeit=30, format='png').get('data')
     if daten:
@@ -100,21 +109,20 @@ SCHAUSPIELER = r"""(function(){
 def main():
     env = dict(os.environ, QTWEBENGINE_REMOTE_DEBUGGING=str(PORT))
     proc = subprocess.Popen([EXE], env=env)
+    # Zeitverlauf: was meldet der DevTools-Port, wie sieht der Bildschirm aus?
+    verlauf = ergebnis.setdefault('devtools_verlauf', [])
     seiten = []
-    ende = time.time() + 120
-    while time.time() < ende and not seiten:
+    for s in range(0, 90, 10):
         try:
-            seiten = [z for z in json.load(urllib.request.urlopen(f'http://127.0.0.1:{PORT}/json/list', timeout=3))
-                      if z.get('type') == 'page']
-        except Exception:  # noqa: BLE001
-            pass
-        if not seiten:
-            time.sleep(2)
-    time.sleep(8)  # Oberfläche fertig laden lassen, dann Liste neu lesen
-    try:
-        seiten = [z for z in json.load(urllib.request.urlopen(f'http://127.0.0.1:{PORT}/json/list', timeout=3)) if z.get('type') == 'page']
-    except Exception:  # noqa: BLE001
-        pass
+            roh = json.load(urllib.request.urlopen(f'http://127.0.0.1:{PORT}/json/list', timeout=3))
+            verlauf.append({'s': s, 'ziele': [{k: z.get(k) for k in ('type', 'title', 'url')} for z in roh]})
+            seiten = [z for z in roh if z.get('type') == 'page']
+        except Exception as e:  # noqa: BLE001
+            verlauf.append({'s': s, 'fehler': repr(e)[:150]})
+        desktop(f'desktop-{s:02d}s')
+        if seiten and s >= 20:
+            break
+        time.sleep(10)
     ergebnis['seiten'] = [{k: z.get(k) for k in ('title', 'url', 'type')} for z in seiten]
     if not seiten:
         ergebnis['fehler'] = 'keine DevTools-Seite nach 120 s'
@@ -124,10 +132,12 @@ def main():
     for z in seiten:
         try:
             versuch = Cdp(z['webSocketDebuggerUrl'])
-            if versuch.js('1+1', zeit=10) == 2:
+            antwort = versuch.rufe('Runtime.evaluate', zeit=10, expression='1+1', returnByValue=True)
+            if (antwort.get('result') or {}).get('value') == 2:
                 cdp, seite = versuch, z
                 break
-            ergebnis.setdefault('seiten_ohne_antwort', []).append(z.get('url'))
+            ergebnis.setdefault('seiten_ohne_antwort', []).append({'url': z.get('url'), 'antwort': str(antwort)[:200],
+                                                                    'verbunden': versuch.offen})
         except Exception as e:  # noqa: BLE001
             ergebnis.setdefault('seiten_fehler', []).append(f"{z.get('url')}: {e!r}"[:200])
     if not cdp:
@@ -184,6 +194,7 @@ def main():
 proc = None
 try:
     proc = main()
+    desktop('desktop-ende')
 except Exception as e:  # noqa: BLE001
     ergebnis['fehler'] = repr(e)
 finally:
@@ -195,3 +206,13 @@ finally:
         print('  ', z)
     if proc:
         proc.kill()
+    # Protokoll des Media Players mitnehmen (ohne Zugangsdaten: schwärzen)
+    try:
+        ordner = os.path.join(os.environ.get('LOCALAPPDATA', ''), 'JellyfinMediaPlayer', 'logs')
+        for name in os.listdir(ordner):
+            with open(os.path.join(ordner, name), encoding='utf-8', errors='replace') as f:
+                inhalt = schwaerzen(f.read()[-200000:])
+            with open(os.path.join(AUS, 'jmp-' + name), 'w', encoding='utf-8') as f:
+                f.write(inhalt)
+    except Exception as e:  # noqa: BLE001
+        print('Protokoll:', repr(e))

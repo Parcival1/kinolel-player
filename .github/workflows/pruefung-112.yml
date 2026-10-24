@@ -32,7 +32,7 @@ jobs:
       env:
         KINOLEL_TEST_PW: ${{ secrets.KINOLEL_TEST_PW }}
       run: |
-        python -m pip install --quiet psutil websocket-client
+        python -m pip install --quiet psutil websocket-client pillow
         python bundle/test/pruefung_112.py "$env:JMP_EXE" pruefung
       shell: pwsh
     - name: Ergebnis sichern
