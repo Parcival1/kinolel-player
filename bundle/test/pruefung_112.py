@@ -100,23 +100,45 @@ SCHAUSPIELER = r"""(function(){
 def main():
     env = dict(os.environ, QTWEBENGINE_REMOTE_DEBUGGING=str(PORT))
     proc = subprocess.Popen([EXE], env=env)
-    seite = None
+    seiten = []
     ende = time.time() + 120
-    while time.time() < ende and not seite:
+    while time.time() < ende and not seiten:
         try:
-            seite = next((z for z in json.load(urllib.request.urlopen(f'http://127.0.0.1:{PORT}/json/list', timeout=3))
-                          if z.get('type') == 'page'), None)
+            seiten = [z for z in json.load(urllib.request.urlopen(f'http://127.0.0.1:{PORT}/json/list', timeout=3))
+                      if z.get('type') == 'page']
         except Exception:  # noqa: BLE001
+            pass
+        if not seiten:
             time.sleep(2)
-    if not seite:
+    time.sleep(8)  # Oberfläche fertig laden lassen, dann Liste neu lesen
+    try:
+        seiten = [z for z in json.load(urllib.request.urlopen(f'http://127.0.0.1:{PORT}/json/list', timeout=3)) if z.get('type') == 'page']
+    except Exception:  # noqa: BLE001
+        pass
+    ergebnis['seiten'] = [{k: z.get(k) for k in ('title', 'url', 'type')} for z in seiten]
+    if not seiten:
         ergebnis['fehler'] = 'keine DevTools-Seite nach 120 s'
         return proc
+    # die Seite nehmen, die auf „1+1“ antwortet (bei Qt gibt es teils mehrere Seiten)
+    cdp = None
+    for z in seiten:
+        try:
+            versuch = Cdp(z['webSocketDebuggerUrl'])
+            if versuch.js('1+1', zeit=10) == 2:
+                cdp, seite = versuch, z
+                break
+            ergebnis.setdefault('seiten_ohne_antwort', []).append(z.get('url'))
+        except Exception as e:  # noqa: BLE001
+            ergebnis.setdefault('seiten_fehler', []).append(f"{z.get('url')}: {e!r}"[:200])
+    if not cdp:
+        ergebnis['fehler'] = 'keine Seite antwortet über DevTools'
+        return proc
+    ergebnis['gewaehlte_seite'] = seite.get('url')
     try:
         version = json.load(urllib.request.urlopen(f'http://127.0.0.1:{PORT}/json/version', timeout=5))
         ergebnis['browser'] = {k: version.get(k) for k in ('Browser', 'User-Agent', 'Protocol-Version')}
     except Exception as e:  # noqa: BLE001
         ergebnis['browser'] = repr(e)
-    cdp = Cdp(seite['webSocketDebuggerUrl'])
     cdp.ereignis_rueckrufe.append(ereignis)
     for d in ('Runtime.enable', 'Log.enable', 'Page.enable', 'Network.enable'):
         cdp.rufe(d)
