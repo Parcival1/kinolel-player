@@ -108,7 +108,11 @@ SCHAUSPIELER = r"""(function(){
 
 def main():
     env = dict(os.environ, QTWEBENGINE_REMOTE_DEBUGGING=str(PORT))
-    proc = subprocess.Popen([EXE], env=env)
+    # Runner ohne Grafikkarte (wie Lels VM 123): mit GPU bleibt das Fenster schwarz (Render-Prozess stürzt ab) –
+    # v1.12.0 liefert dafür JellyfinMediaPlayer-NoChromiumGPU.bat = Start mit --disable-gpu (Variable OHNE_GPU=1)
+    argumente = [EXE] + (['--disable-gpu'] if os.environ.get('OHNE_GPU') == '1' else [])
+    ergebnis['start'] = ' '.join(os.path.basename(a) for a in argumente)
+    proc = subprocess.Popen(argumente, env=env)
     # Zeitverlauf: was meldet der DevTools-Port, wie sieht der Bildschirm aus?
     verlauf = ergebnis.setdefault('devtools_verlauf', [])
     seiten = []
