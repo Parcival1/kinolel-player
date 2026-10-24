@@ -426,15 +426,21 @@ def anmelden(cdp, ergebnis, teil):
     cdp.js("(function(){var f=document.querySelector('#loginPage .manualLoginForm');"
            "if(f&&f.classList.contains('hide')){var b=document.querySelector('#loginPage .btnManual');if(b)b.click();}return true})()")
     time.sleep(1)
-    cdp.js("(function(){var n=document.querySelector('#txtManualName');n.focus();n.value=%s;"
-           "n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));"
-           "var p=document.querySelector('#txtManualPassword');p.value='';p.focus();return true})()" % json.dumps(BENUTZER))
-    cdp.rufe('Input.insertText', text=PASSWORT)  # Passwort nur als Tastatureingabe, nie als Skripttext
+    # Passwort NIE tippen (Input.insertText): 24.10.2026 landete ein getipptes Passwort unter Last im Benutzerfeld und
+    # stand im Klartext auf einem öffentlichen Testbild (Android-Test). Hier wird die Anmeldung sogar als Video
+    # aufgenommen. Daher beide Felder per Selektor setzen, Werte nur als CDP-Argument, Benutzerfeld prüfen.
+    setzen = ("function(w){Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(this,w);"
+              "this.dispatchEvent(new Event('input',{bubbles:true}));this.dispatchEvent(new Event('change',{bubbles:true}));}")
+    for selektor, wert in (('#txtManualName', BENUTZER), ('#txtManualPassword', PASSWORT)):
+        feld = cdp.rufe('Runtime.evaluate', expression=f"document.querySelector('{selektor}')").get('result', {})
+        if feld.get('objectId'):
+            cdp.rufe('Runtime.callFunctionOn', objectId=feld['objectId'], arguments=[{'value': wert}], functionDeclaration=setzen)
     time.sleep(0.5)
-    if not cdp.js("document.querySelector('#txtManualPassword').value.length > 0"):
-        feld = cdp.rufe('Runtime.evaluate', expression="document.querySelector('#txtManualPassword')").get('result', {})
-        cdp.rufe('Runtime.callFunctionOn', objectId=feld.get('objectId'), arguments=[{'value': PASSWORT}],
-                 functionDeclaration="function(w){this.value=w;this.dispatchEvent(new Event('input',{bubbles:true}));}")
+    if cdp.js("document.querySelector('#txtManualName').value") != BENUTZER \
+            or cdp.js("document.querySelector('#txtManualPassword').type") != 'password':
+        anmeldefelder_leeren(cdp)
+        ergebnis['fehler_' + teil] = 'Anmeldefelder nicht sicher gefüllt'
+        return False
     cdp.js("(function(){var b=document.querySelector('#loginPage .manualLoginForm button[type=submit]');"
            "if(b){b.click();return true}var f=document.querySelector('#loginPage .manualLoginForm');"
            "f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));return true})()")
@@ -442,7 +448,18 @@ def anmelden(cdp, ergebnis, teil):
         return True
     toast = cdp.js("Array.from(document.querySelectorAll('.toast')).map(function(t){return t.textContent}).join(' | ')")
     ergebnis['fehler_' + teil] = 'Anmeldung fehlgeschlagen: ' + schwaerzen(toast or '(kein Hinweis)')[:300]
+    anmeldefelder_leeren(cdp)  # danach folgen Bildschirmfotos
     return False
+
+
+def anmeldefelder_leeren(cdp):
+    for selektor in ('#txtManualName', '#txtManualPassword'):
+        try:
+            cdp.js("(function(){var f=document.querySelector('%s');if(!f)return;"
+                   "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(f,'');"
+                   "f.dispatchEvent(new Event('input',{bubbles:true}));})()" % selektor)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def beobachten(cdp, proc, nr, name, aenderung, ereignisse):
