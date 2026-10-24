@@ -33,8 +33,10 @@ jobs:
         KINOLEL_TEST_PW: ${{ secrets.KINOLEL_TEST_PW }}
       run: |
         python -m pip install --quiet psutil websocket-client pillow
+        # Mit GPU-Pfad und mit --disable-gpu (NoChromiumGPU.bat) blieb das Fenster schwarz (Runner: Windows Server 2025 = 24H2).
+        # Verdacht: alte Chromium-Sandbox (Chrome 83) unter 24H2 -> Durchgänge ohne Sandbox
+        $env:QTWEBENGINE_DISABLE_SANDBOX = "1"
         python bundle/test/pruefung_112.py "$env:JMP_EXE" pruefung
-        # zweiter Durchgang wie JellyfinMediaPlayer-NoChromiumGPU.bat (ohne GPU)
         $env:OHNE_GPU = "1"
         python bundle/test/pruefung_112.py "$env:JMP_EXE" pruefung-ohne-gpu
       shell: pwsh
