@@ -40,6 +40,9 @@ os.makedirs(AUS, exist_ok=True)
 startseite.AUSGABE = AUS
 PORT, PORT_ALT = 9231, 9232
 ALT = 'v0.1.6'
+VORGAENGER = 'v0.3.1'  # Lel 25.10.: Windows wird 1.0 – Umstieg von der Web-App 0.3.x per Auto-Update
+_m = __import__('re').search(r'KinoLel-Setup-([\d.]+)-x64', os.path.basename(SETUP))
+VERSION_NEU = _m[1] if _m else '?'
 LOCAL = os.environ['LOCALAPPDATA']
 ORDNER = os.path.join(LOCAL, 'Programs', 'KinoLel')
 EXE = os.path.join(ORDNER, 'KinoLel.exe')
@@ -379,7 +382,7 @@ def umstieg():
     d = dialog_finden(PORT, 20)
     text = dialog_text(d) if d else ''
     import re as _re
-    merke('„Was ist neu“ nach dem Umstieg', d and _re.search(r'KinoLel 0\.3\.\d', text), text[:160])
+    merke('„Was ist neu“ nach dem Umstieg', d and f'KinoLel {VERSION_NEU}' in text, text[:160])
     merke('„Was ist neu“ in der KinoLel-Sprache (Ungarisch, Windows Englisch)', d and 'Újdonságok' in text, text[:60])
     if d:
         d.js("document.getElementById('kinolel-ok').click()")
@@ -566,14 +569,15 @@ def tv_modus():
     beenden(sanft=True)
 
 
-def auto_update():
-    """7. Versionsliste (lokal) mit 0.3.99 -> Hinweis -> Jetzt aktualisieren -> Setup still -> KinoLel wieder da"""
-    ordner = os.path.join(os.environ.get('RUNNER_TEMP', AUS), 'update-server')
+def update_server(version):
+    """Lokale Versionsliste wie kinolel.de/web/kinolel/apps.json: <version> mit dem Setup dieses Laufs"""
+    ordner = os.path.join(os.environ.get('RUNNER_TEMP', AUS), 'update-server-' + version)
     os.makedirs(ordner, exist_ok=True)
-    shutil.copy(SETUP, os.path.join(ordner, 'KinoLel-Setup-0.3.99-x64.exe'))
+    datei = f'KinoLel-Setup-{version}-x64.exe'
+    shutil.copy(SETUP, os.path.join(ordner, datei))
     with open(os.path.join(ordner, 'apps.json'), 'w', encoding='utf-8') as f:
-        json.dump({'windows': {'version': 'v0.3.99', 'url': 'http://127.0.0.1:8766/KinoLel-Setup-0.3.99-x64.exe',
-                               'datei': 'KinoLel-Setup-0.3.99-x64.exe', 'seite': 'https://kinolel.de'}}, f)
+        json.dump({'windows': {'version': 'v' + version, 'url': f'http://127.0.0.1:8766/{datei}',
+                               'datei': datei, 'seite': 'https://kinolel.de'}}, f)
 
     class Leise(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *a, **k):
@@ -583,11 +587,30 @@ def auto_update():
             pass
     server = http.server.ThreadingHTTPServer(('127.0.0.1', 8766), Leise)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def installierte_version():
+    import winreg
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Uninstall') as k:
+        for i in range(winreg.QueryInfoKey(k)[0]):
+            try:
+                with winreg.OpenKey(k, winreg.EnumKey(k, i)) as u:
+                    if 'KinoLel' in str(winreg.QueryValueEx(u, 'DisplayName')[0]):
+                        return str(winreg.QueryValueEx(u, 'DisplayVersion')[0])
+            except OSError:
+                pass
+    return None
+
+
+def auto_update():
+    """7. Versionsliste (lokal) mit 9.9 -> Hinweis -> Jetzt aktualisieren -> Setup still -> KinoLel wieder da"""
+    server = update_server('9.9')
     try:
         proc, cdp = app_starten(KINOLEL_TEST_APPS_LISTE='http://127.0.0.1:8766/apps.json')
         d = dialog_finden(PORT, 40)
         text = dialog_text(d) if d else ''
-        merke('Update-Hinweis (Versionsliste mit 0.3.99)', d and '0.3.99' in text, text[:140])
+        merke('Update-Hinweis (Versionsliste mit 9.9)', d and '9.9' in text, text[:140])
         if not d:
             return
         alt_pid = proc.pid
@@ -606,6 +629,55 @@ def auto_update():
     finally:
         for quelle in glob.glob(os.path.join(os.environ.get('TEMP', ''), 'KinoLel-Update.log')):
             shutil.copy(quelle, os.path.join(AUS, 'update-setup.log'))
+        server.shutdown()
+        beenden(sanft=True)
+
+
+def von_vorgaenger():
+    """8. Lel 25.10.: echte v0.3.1 installieren, ihr Auto-Update findet die neue Version (Versionsliste lokal) ->
+    Jetzt aktualisieren -> Setup still -> neue Version startet, „Was ist neu“ mit ihrer Nummer, Anmeldung bleibt"""
+    beenden()
+    vor_setup = os.path.join(os.environ.get('RUNNER_TEMP', AUS), f'KinoLel-Setup-{VORGAENGER[1:]}-x64.exe')
+    urllib.request.urlretrieve(f'https://github.com/Parcival1/kinolel-player/releases/download/{VORGAENGER}/KinoLel-Setup-{VORGAENGER[1:]}-x64.exe', vor_setup)
+    server = update_server(VERSION_NEU)
+    try:
+        # Umgebung erbt das Setup und darüber die App, die es danach startet (DevTools, Versionsliste, „zuletzt gesehen“)
+        env = umgebung(KINOLEL_DEVTOOLS_PORT=PORT, KINOLEL_TEST_APPS_LISTE='http://127.0.0.1:8766/apps.json',
+                       KINOLEL_TEST_NEUIGKEITEN_SEIT=VORGAENGER[1:])
+        rc = setup_still(vor_setup, 'vorgaenger', env=env)
+        merke(f'{VORGAENGER} installiert (wie bei Lel)', rc == 0 and installierte_version() == VORGAENGER[1:],
+              f'Setup {rc}, installiert {installierte_version()}')
+        if not seite_finden(time.time() + 90, PORT):
+            subprocess.Popen([EXE], cwd=ORDNER, env=env)
+        alt = [p.pid for p in kinolel_prozesse()]
+        d = dialog_finden(PORT, 60)
+        text = dialog_text(d) if d else ''
+        merke(f'{VORGAENGER}: Update-Hinweis auf {VERSION_NEU}', d and VERSION_NEU in text, text[:140])
+        if not d:
+            return
+        d.js("document.getElementById('kinolel-jetzt').click()")
+        ende = time.time() + 180
+        while time.time() < ende and any(psutil.pid_exists(p) for p in alt):
+            time.sleep(1)
+        z = seite_finden(time.time() + 300, PORT)
+        merke(f'{VORGAENGER} -> {VERSION_NEU}: neue Version installiert und gestartet',
+              z and installierte_version() == VERSION_NEU, f'installiert {installierte_version()}')
+        if not z:
+            return
+        d = dialog_finden(PORT, 40)
+        text = dialog_text(d) if d else ''
+        merke(f'{VORGAENGER} -> {VERSION_NEU}: „Was ist neu“ mit {VERSION_NEU}', d and f'KinoLel {VERSION_NEU}' in text
+              and f'{VERSION_NEU}.0' not in text, text[:160])
+        if d:
+            d.js("document.getElementById('kinolel-ok').click()")
+        cdp = Cdp(z['webSocketDebuggerUrl'])
+        ok = warten(cdp, STARTSEITE_BEREIT, time.time() + 60)
+        merke(f'{VORGAENGER} -> {VERSION_NEU}: Anmeldung bleibt', ok and not cdp.js("/^#\\/login/.test(location.hash)"))
+        ua = cdp.js('navigator.userAgent') or ''
+        merke(f'Version im Browser-Kennzeichen: KinoLel/{VERSION_NEU}', f'KinoLel/{VERSION_NEU} ' in ua, ua[-60:])
+    finally:
+        for quelle in glob.glob(os.path.join(os.environ.get('TEMP', ''), 'KinoLel-Update.log')):
+            shutil.copy(quelle, os.path.join(AUS, 'update-vorgaenger-setup.log'))
         server.shutdown()
         beenden(sanft=True)
 
@@ -630,6 +702,7 @@ def main():
             abspielen()
             tv_modus()
             auto_update()
+            von_vorgaenger()
     except Exception as e:  # noqa: BLE001
         merke('Ablauf', False, schwaerzen(f'{type(e).__name__}: {e}')[:300])
     finally:

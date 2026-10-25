@@ -38,6 +38,8 @@ jobs:
       - name: Version
         run: |
           $v = (Get-Content webapp/package.json -Raw | ConvertFrom-Json).version
+          # ab 1.0 zwei Stellen (Lel 25.10.): package.json 1.0.0 -> Setup/ZIP/Anzeige 1.0
+          if ($v -match '^([1-9][0-9]*\.[0-9]+)\.0$') { $v = $Matches[1] }
           "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "KinoLel $v"
 

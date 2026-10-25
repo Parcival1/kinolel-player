@@ -1,15 +1,21 @@
 {
   "versionen": [
     {
-      "version": "0.3.2",
+      "version": "1.0",
       "de": [
-        "Meldungen der App (zum Beispiel diese hier und Hinweise zu Updates) erscheinen jetzt in der Sprache, die du in KinoLel gewählt hast. Außerdem Fehlerbehebungen und Verbesserungen."
+        "KinoLel für Windows ist jetzt Version 1.0.",
+        "Meldungen der App (zum Beispiel diese hier und Hinweise zu Updates) erscheinen jetzt in der Sprache, die du in KinoLel gewählt hast.",
+        "Außerdem Fehlerbehebungen und Verbesserungen."
       ],
       "hu": [
-        "Az alkalmazás üzenetei (például ez, és a frissítésekről szóló értesítések) most a KinoLelben kiválasztott nyelven jelennek meg. Emellett hibajavítások és fejlesztések."
+        "A Windowsos KinoLel elérte az 1.0-s verziót.",
+        "Az alkalmazás üzenetei (például ez, és a frissítésekről szóló értesítések) most a KinoLelben kiválasztott nyelven jelennek meg.",
+        "Emellett hibajavítások és fejlesztések."
       ],
       "en": [
-        "App messages (like this one and update notices) now appear in the language you chose in KinoLel. Also bug fixes and improvements."
+        "KinoLel for Windows is now version 1.0.",
+        "App messages (like this one and update notices) now appear in the language you chose in KinoLel.",
+        "Also bug fixes and improvements."
       ]
     },
     {

@@ -23,6 +23,8 @@ function zeit(name) {
 
 const MARKE = require('./marke.json');
 const NEUIGKEITEN = require('./neuigkeiten.json');
+// Lel 25.10.: ab 1.0 zählen die Versionen 1.0, 1.1 …; package.json braucht drei Stellen (1.0.0) – überall gezeigt: „1.0“
+const VERSION = app.getVersion().replace(/^([1-9]\d*\.\d+)\.0$/, '$1');
 
 const SERVER = MARKE.server;
 const TITEL_HOEHE = 36;
@@ -45,7 +47,8 @@ if (DEVTOOLS_PORT) app.commandLine.appendSwitch('remote-debugging-port', DEVTOOL
 // Abspielen ohne vorherigen Klick: Fernsteuerung vom Server, nächste Folge, TV-Modus mit Fernbedienung
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 // wie Chrome, mit „KinoLel/<Version>“, ohne „Electron“
-app.userAgentFallback = app.userAgentFallback.replace(/\s*Electron\/\S+/i, '');
+app.userAgentFallback = app.userAgentFallback.replace(/\s*Electron\/\S+/i, '')
+  .replace(new RegExp(`\\b${MARKE.name}/[\\d.]+`), `${MARKE.name}/${VERSION}`);
 Menu.setApplicationMenu(null);
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -335,7 +338,7 @@ function neuer(a, b) {
   return false;
 }
 async function neuigkeitenZeigen() {
-  const aktuell = app.getVersion();
+  const aktuell = VERSION;
   let gesehen = TEST_NEUIGKEITEN_SEIT || einst.gesehen;
   if (!gesehen && !ALTE_APP_DATEN && !TEST_NEUIGKEITEN_SEIT) { einst.gesehen = aktuell; speichern(); return; }
   if (gesehen && !neuer(aktuell, gesehen)) return;
@@ -373,7 +376,7 @@ async function updatePruefen(vonHand = false) {
   }
   if (!eintrag?.version || !eintrag?.url) return;
   const neu = String(eintrag.version).replace(/^v/i, '');
-  const aktuell = TEST_VERSION || app.getVersion();
+  const aktuell = TEST_VERSION || VERSION;
   log('Update-Suche:', aktuell, '->', neu);
   if (!neuer(neu, aktuell)) {
     if (vonHand) await dialogZeigen({ titel: MARKE.name, text: t('aktuell'), knoepfe: [{ id: 'ok', text: t('ok'), haupt: true }] });
@@ -443,7 +446,7 @@ async function grafikInfo() {
     const geraete = (info.gpuDevice || []).map((g) => `${g.vendorId?.toString(16)}:${g.deviceId?.toString(16)} ${g.driverVendor || ''} ${g.driverVersion || ''} ${g.active ? '(aktiv)' : ''}`.trim());
     const dekoder = [...new Set((info.videoDecoding || info.videoDecodeAcceleratorSupportedProfile || []).map((d) => d.profile ?? d.codec ?? JSON.stringify(d)))];
     text = [
-      `KinoLel ${app.getVersion()} · Chromium ${process.versions.chrome}`,
+      `KinoLel ${VERSION} · Chromium ${process.versions.chrome}`,
       `Windows ${os.release()} · ${os.cpus()[0]?.model || ''}`,
       '', 'Grafikkarte(n):', ...geraete.map((g) => '  ' + g),
       '', 'Funktionen:', ...Object.entries(app.getGPUFeatureStatus()).map(([k, v]) => `  ${k}: ${v}`),
@@ -490,7 +493,7 @@ if (!app.requestSingleInstanceLock()) {
   anmeldungUebernehmen();
   app.whenReady().then(async () => {
     zeit('electron_bereit');
-    log(`Start KinoLel ${app.getVersion()} (Chromium ${process.versions.chrome})`, TV ? 'TV-Modus' : '',
+    log(`Start KinoLel ${VERSION} (Chromium ${process.versions.chrome})`, TV ? 'TV-Modus' : '',
       'GPU:', JSON.stringify(app.getGPUFeatureStatus()));
     fensterOeffnen();
     await neuigkeitenZeigen();
