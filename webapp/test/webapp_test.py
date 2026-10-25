@@ -273,7 +273,11 @@ def umstieg():
     if not d:
         nach_vorne_und_tasten(0x11, 0x10, 0x47)  # Strg, Umschalt, G
         d = dialog_finden(PORT, 12)
-    text = d.js("document.querySelector('pre') ? document.querySelector('pre').textContent : ''") if d else ''
+    text = ''
+    ende = time.time() + 8
+    while d and time.time() < ende and 'Chromium' not in (text or ''):  # Inhalt kommt kurz nach dem Laden
+        text = d.js("document.querySelector('pre') ? document.querySelector('pre').textContent : ''")
+        time.sleep(0.5)
     with open(os.path.join(AUS, '03-grafik-info.txt'), 'w', encoding='utf-8') as f:
         f.write(text or '')
     merke('Grafik-Info (Strg+Umschalt+G)', d and 'Chromium' in (text or ''), (text or '').splitlines()[0] if text else '')

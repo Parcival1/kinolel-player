@@ -399,7 +399,7 @@ async function grafikInfo() {
     const geraete = (info.gpuDevice || []).map((g) => `${g.vendorId?.toString(16)}:${g.deviceId?.toString(16)} ${g.driverVendor || ''} ${g.driverVersion || ''} ${g.active ? '(aktiv)' : ''}`.trim());
     const dekoder = [...new Set((info.videoDecoding || info.videoDecodeAcceleratorSupportedProfile || []).map((d) => d.profile ?? d.codec ?? JSON.stringify(d)))];
     text = [
-      `KinoLel ${app.getVersion()} · Chromium ${process.versions.chrome} · Electron ${process.versions.electron}`,
+      `KinoLel ${app.getVersion()} · Chromium ${process.versions.chrome}`,
       `Windows ${os.release()} · ${os.cpus()[0]?.model || ''}`,
       '', 'Grafikkarte(n):', ...geraete.map((g) => '  ' + g),
       '', 'Funktionen:', ...Object.entries(app.getGPUFeatureStatus()).map(([k, v]) => `  ${k}: ${v}`),
