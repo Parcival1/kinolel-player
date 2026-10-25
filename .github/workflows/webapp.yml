@@ -91,7 +91,11 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
-      - name: Vorab-Version veröffentlichen (nur bei Tag v*)
+      - name: Ergebnis prüfen (Lel 25.10.: Release nur nach grünem Test)
+        run: |
+          python -c "import json,sys; e=json.load(open('webtest/ergebnis.json', encoding='utf-8')); f=[k for k,v in e.items() if not v['ok']]; print('Fehler:', f) if f else print('alles OK'); sys.exit(1 if f else 0)"
+
+      - name: Vorab-Version veröffentlichen (nur bei Tag v*, nach grünem Test)
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
