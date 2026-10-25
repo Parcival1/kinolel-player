@@ -160,10 +160,11 @@ def nach_vorne_und_tasten(*tasten):
     user32.SetForegroundWindow(ziel[0])
     user32.keybd_event(0x12, 0, 2, 0)
     time.sleep(0.5)
-    # einmal in die Titelleiste (links, neben „KinoLel“) klicken: Tastatur geht dann sicher an das Fenster
+    # einmal in die Seite klicken (links oben in der Kopfleiste von kinolel.de, unter der Titelleiste): die
+    # Tastatur geht dann an kinolel.de – wie bei einem Menschen, der das Fenster benutzt
     r = wt.RECT()
     user32.GetWindowRect(ziel[0], ctypes.byref(r))
-    user32.SetCursorPos(r.left + 200, r.top + 18)
+    user32.SetCursorPos(r.left + 30, r.top + 36 + 45)
     user32.mouse_event(0x0002, 0, 0, 0, 0)
     user32.mouse_event(0x0004, 0, 0, 0, 0)
     time.sleep(1)
