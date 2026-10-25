@@ -14,6 +14,13 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 
+// Startzeiten (Lel 25.10.: „lädt aber seeeeeehr lange“): Millisekunden ab Prozessstart, im Protokoll als „Startzeiten“
+const PROZESS_START = Date.now() - Math.round(process.uptime() * 1000);
+const zeiten = {};
+function zeit(name) {
+  if (!(name in zeiten)) zeiten[name] = Date.now() - PROZESS_START;
+}
+
 const MARKE = require('./marke.json');
 const NEUIGKEITEN = require('./neuigkeiten.json');
 
@@ -166,7 +173,8 @@ function fensterOeffnen() {
 
   const sicher = { sandbox: true, contextIsolation: true, nodeIntegration: false };
   ansichten.titel = new WebContentsView({ webPreferences: sicher });
-  ansichten.seite = new WebContentsView({ webPreferences: { ...sicher, preload: path.join(__dirname, 'seite-preload.js') } });
+  ansichten.seite = new WebContentsView({ webPreferences: { ...sicher, preload: path.join(__dirname, 'seite-preload.js'),
+    additionalArguments: [`--kinolel-layout=${TV ? 'tv' : 'desktop'}`] } });
   ansichten.start = new WebContentsView({ webPreferences: sicher });
   for (const v of [ansichten.titel, ansichten.seite, ansichten.start]) v.setBackgroundColor(MARKE.farbeHintergrund);
   fenster.contentView.addChildView(ansichten.titel);
@@ -186,7 +194,7 @@ function fensterOeffnen() {
 
   ansichten.titel.webContents.loadFile(path.join(__dirname, 'oberflaeche', 'titel.html'));
   ansichten.start.webContents.loadFile(path.join(__dirname, 'oberflaeche', 'start.html'));
-  ansichten.start.webContents.once('did-finish-load', () => fenster?.show());
+  ansichten.start.webContents.once('did-finish-load', () => { zeit('fenster_sichtbar'); fenster?.show(); });
   setTimeout(() => fenster && !fenster.isVisible() && fenster.show(), 3000);
 
   const seite = ansichten.seite.webContents;
@@ -205,7 +213,11 @@ function fensterOeffnen() {
   seite.on('leave-html-full-screen', () => { if (!TV) fenster?.setFullScreen(false); });
   seite.on('render-process-gone', (_e, d) => { log('Seite abgestürzt:', d.reason); seite.reload(); });
   seite.on('did-fail-load', (_e, code, text, url, haupt) => { if (haupt) log('Laden fehlgeschlagen:', code, text, url); });
-  seite.on('did-start-loading', () => { if (startWeg) return; startUeberwachen(); });
+  seite.on('did-start-loading', () => { zeit('laden_beginnt'); if (startWeg) return; startUeberwachen(); });
+  seite.on('did-navigate', () => zeit('erste_antwort'));
+  seite.on('dom-ready', () => { zeit('dom_bereit'); leistungsregeln(seite); });
+  seite.on('did-finish-load', () => zeit('seite_geladen'));
+  zeit('kinolel_de_aufrufen');
   seite.loadURL(SERVER + '/web/');
 }
 
@@ -219,7 +231,18 @@ function startUeberwachen() {
   notbremse = setTimeout(() => { log('Startbild nach Notbremse entfernt'); startEntfernen(true); }, START_NOTBREMSE_MS);
 }
 ipcMain.on('kinolel-seite-stand', (e, stand) => {
-  if (startWeg || !ansichten.seite || e.sender !== ansichten.seite.webContents) return;
+  if (!ansichten.seite || e.sender !== ansichten.seite.webContents) return;
+  if (stand === 'startseite') {
+    // kinolel.de fertig (Lade-Overlay weg, erste Seite steht): Zeiten einmal protokollieren
+    zeit('startseite_fertig');
+    if (!zeiten._protokolliert) {
+      zeiten._protokolliert = true;
+      log('Startzeiten (ms ab Prozessstart):', Object.entries(zeiten).filter(([k]) => !k.startsWith('_')).map(([k, v]) => `${k}=${v}`).join(' '));
+    }
+    return;
+  }
+  if (startWeg) return;
+  zeit('startbild_weg');
   clearTimeout(notbremse);
   log('Startbild weg nach', Date.now() - startBeginn, 'ms:', stand);
   startEntfernen(stand !== 'overlay');
@@ -413,16 +436,27 @@ async function grafikInfo() {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-ipcMain.on('kinolel-layout', (e) => { e.returnValue = TV ? 'tv' : 'desktop'; });
-// Leistungsregeln (aus der bisherigen App, gemessen mit startseite.py): ohne Grafikkarte zeichnet Chromium jedes Bild in
-// Software – Dauer-Animationen der Media Bar halten dann die CPU beschäftigt. KINOLEL_LEISTUNG=0 schaltet sie ab (Test).
-ipcMain.on('kinolel-leistung', (e) => {
+// Leistungsregeln (gemessen mit startseite.py, Windows ohne GPU): ohne Grafikkarte zeichnet Chromium jedes Bild in Software
+// – die Weichzeichner und die laufende Fortschrittsleiste des Karussells lassen die Seite dann dauernd neu zeichnen
+// (82 % statt 6 % CPU). Ken-Burns-Zoom bleibt an (Lel 25.10.: „das Zoomen im Karussell fehlt“; KINOLEL_KENBURNS=0 nur
+// für den Vergleich im Test). Asynchron eingespielt, damit nichts den Seitenaufbau aufhält. KINOLEL_LEISTUNG=0 = aus.
+let ohneGpu = null;
+async function gpuBekannt() {
+  if (ohneGpu !== null) return ohneGpu;
+  try { await Promise.race([app.getGPUInfo('basic'), new Promise((r) => setTimeout(r, 3000))]); } catch (_) {}
   const g = app.getGPUFeatureStatus();
-  e.returnValue = {
-    an: process.env.KINOLEL_LEISTUNG !== '0',
-    ohneGpu: /disabled|unavailable/.test(g.gpu_compositing || ''),
-  };
-});
+  ohneGpu = /disabled|unavailable/.test(g.gpu_compositing || '');
+  return ohneGpu;
+}
+async function leistungsregeln(wc) {
+  if (process.env.KINOLEL_LEISTUNG === '0') return;
+  let stil = process.env.KINOLEL_KENBURNS === '0' ? '.backdrop.high-quality{animation:none!important}' : '';
+  if (await gpuBekannt()) {
+    stil += '*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}';
+    stil += '.spec-rail,.spec-progress{display:none!important}';
+  }
+  if (stil && !wc.isDestroyed()) wc.insertCSS(stil, { cssOrigin: 'author' }).catch(() => {});
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -434,6 +468,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   anmeldungUebernehmen();
   app.whenReady().then(async () => {
+    zeit('electron_bereit');
     log(`Start KinoLel ${app.getVersion()} (Chromium ${process.versions.chrome})`, TV ? 'TV-Modus' : '',
       'GPU:', JSON.stringify(app.getGPUFeatureStatus()));
     fensterOeffnen();

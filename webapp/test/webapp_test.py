@@ -192,6 +192,117 @@ def log_text():
 
 
 # ---------------------------------------------------------------------------------------------------------------
+FERTIG = STARTSEITE_BEREIT[:-4] + " && !document.getElementById('kinolel-lade')})()"
+CHROME = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
+APP_DATEN = os.path.join(LOCAL, 'KinoLel', 'App')
+
+
+def bis_fertig(befehl, port, cwd=None, env=None, frist=90):
+    """Sekunden vom Programmstart, bis kinolel.de fertig ist (Startseite steht, Lade-Overlay weg)"""
+    t0 = time.time()
+    proc = subprocess.Popen(befehl, cwd=cwd, env=env or umgebung(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cdp = None
+    while time.time() - t0 < frist and not cdp:
+        for z in ziele(port):
+            if z.get('type') == 'page' and 'kinolel.de' in z.get('url', ''):
+                try:
+                    cdp = Cdp(z['webSocketDebuggerUrl'])
+                except Exception:  # noqa: BLE001
+                    pass
+                break
+        time.sleep(0.1)
+    while cdp and time.time() - t0 < frist:
+        try:
+            if cdp.js(FERTIG, zeit=5):
+                return round(time.time() - t0, 1), proc
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(0.1)
+    return None, proc
+
+
+def letzte_startzeiten():
+    z = [x for x in log_text().splitlines() if 'Startzeiten' in x]
+    return z[-1].split('Startzeiten (ms ab Prozessstart):', 1)[-1].strip() if z else ''
+
+
+def chrome_beenden():
+    subprocess.run(['taskkill', '/F', '/IM', 'chrome.exe'], capture_output=True)
+    time.sleep(2)
+
+
+def startzeiten():
+    """Lel 25.10.: „lädt aber seeeeeehr lange. Ca 13 Sekunden“ – kalt/warm, App gegen Chrome auf demselben Runner"""
+    werte = {}
+    # App kalt: HTTP- und Skript-Cache leeren (Anmeldung bleibt)
+    beenden(sanft=True)
+    for ordner in ('Cache', 'Code Cache', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache'):
+        shutil.rmtree(os.path.join(APP_DATEN, ordner), ignore_errors=True)
+    werte['app_kalt'], _ = bis_fertig([EXE], PORT, ORDNER, umgebung(KINOLEL_DEVTOOLS_PORT=PORT))
+    time.sleep(3)
+    werte['app_kalt_phasen'] = letzte_startzeiten()
+    beenden(sanft=True)
+    werte['app_warm'], _ = bis_fertig([EXE], PORT, ORDNER, umgebung(KINOLEL_DEVTOOLS_PORT=PORT))
+    time.sleep(3)
+    werte['app_warm_phasen'] = letzte_startzeiten()
+    cache = sum(os.path.getsize(os.path.join(w, d)) for w, _, ds in os.walk(os.path.join(APP_DATEN, 'Cache')) for d in ds)
+    beenden(sanft=True)
+    merke('HTTP-Cache bleibt über Neustarts (persistente Sitzung)', cache > 1_000_000, f'{cache / 1e6:.1f} MB')
+    # Chrome mit derselben Anmeldung (Local Storage der App kopiert – keine zweite Anmeldung)
+    if os.path.exists(CHROME):
+        profil = os.path.join(os.environ.get('RUNNER_TEMP', AUS), 'chrome-vergleich')
+        shutil.rmtree(profil, ignore_errors=True)
+        shutil.copytree(os.path.join(APP_DATEN, 'Local Storage'), os.path.join(profil, 'Default', 'Local Storage'))
+        befehl = [CHROME, f'--remote-debugging-port={PORT + 5}', f'--user-data-dir={profil}', '--no-first-run',
+                  '--no-default-browser-check', '--window-size=1440,900', 'https://kinolel.de/web/']
+        werte['chrome_kalt'], _ = bis_fertig(befehl, PORT + 5)
+        chrome_beenden()
+        werte['chrome_warm'], _ = bis_fertig(befehl, PORT + 5)
+        chrome_beenden()
+    with open(os.path.join(AUS, 'startzeiten.json'), 'w', encoding='utf-8') as f:
+        json.dump(werte, f, ensure_ascii=False, indent=1)
+    print('Startzeiten:', json.dumps(werte, ensure_ascii=False))
+    merke('Startzeit App kalt / warm', werte.get('app_kalt') and werte.get('app_warm'),
+          f"kalt {werte.get('app_kalt')} s, warm {werte.get('app_warm')} s – Phasen warm: {werte.get('app_warm_phasen')}")
+    if werte.get('chrome_warm'):
+        merke('Startzeit: App nicht langsamer als kinolel.de in Chrome (warm)',
+              werte.get('app_warm') and werte['app_warm'] <= werte['chrome_warm'] * 1.25 + 1.0,
+              f"App {werte.get('app_warm')} s, Chrome {werte['chrome_warm']} s (kalt: App {werte.get('app_kalt')} s, Chrome {werte.get('chrome_kalt')} s)")
+
+
+KENBURNS = r"""(function(){
+  var a = document.getAnimations().filter(function(x){ return x.animationName === 'kenBurnsZoomIn' && x.playState === 'running' });
+  if (!a.length) return {laeuft: 0};
+  var el = a[0].effect && a[0].effect.target;
+  return {laeuft: a.length, transform: el ? getComputedStyle(el).transform : null};
+})()"""
+
+
+def ken_burns():
+    """Lel 25.10.: „das Zoomen im Karussell fehlt“ – Zoom läuft (Animation) und das Bild wird sichtbar größer"""
+    proc, cdp = app_starten()
+    if not cdp:
+        return merke('Ken-Burns-Zoom im Karussell', False, 'App nicht erreichbar')
+    warten(cdp, FERTIG, time.time() + 60)
+    ok = warten(cdp, "document.getAnimations().some(function(x){return x.animationName==='kenBurnsZoomIn'&&x.playState==='running'})", time.time() + 30)
+    vorher = cdp.js(KENBURNS) or {}
+    bild(cdp, '04a-karussell-zoom')
+    time.sleep(3)
+    nachher = cdp.js(KENBURNS) or {}
+    bild(cdp, '04b-karussell-zoom-3s')
+
+    def skala(m):
+        try:
+            return float(m.split('(')[1].split(',')[0])
+        except Exception:  # noqa: BLE001
+            return None
+    s1, s2 = skala(vorher.get('transform') or ''), skala(nachher.get('transform') or '')
+    merke('Ken-Burns-Zoom im Karussell läuft (Bild wird größer)', ok and s1 and s2 and s2 > s1,
+          f'Maßstab {s1} -> {s2} in 3 s')
+    beenden(sanft=True)
+
+
+# ---------------------------------------------------------------------------------------------------------------
 def umstieg():
     """1.–2. Umstieg von der echten v0.1.6 mit Anmeldung"""
     alt_setup = os.path.join(os.environ.get('RUNNER_TEMP', AUS), f'KinoLel-Setup-{ALT[1:]}-x64.exe')
@@ -301,6 +412,13 @@ def startseite_beobachten():
         json.dump(teil, f, ensure_ascii=False, indent=1)
     v = (teil.get('varianten') or [{}])[0]
     fl = teil.get('flackern_anmeldung_webapp') or {}
+    # Vergleich ohne Ken-Burns (Lel will ihn; abschalten nur, wenn er ohne GPU deutlich Last macht)
+    beenden(sanft=True)
+    ohne_kb = {'varianten': []}
+    startseite.sitzung('webapp-ohne-kenburns', [EXE], ORDNER, PORT, startseite.VARIANTEN[:1], ohne_kb,
+                       env={'KINOLEL_DEVTOOLS_PORT': str(PORT), 'KINOLEL_KENBURNS': '0'}, abmelden=False)
+    vk = (ohne_kb.get('varianten') or [{}])[0]
+    merke('Ken-Burns ohne GPU: Last gemessen', True, f"CPU mit Zoom {v.get('cpu_prozent')} % / ohne Zoom {vk.get('cpu_prozent')} %")
     # Vergleich ohne Leistungsregeln (Auftrag: nur behalten, wenn sie messbar helfen)
     beenden(sanft=True)
     ohne = {'varianten': []}
@@ -485,6 +603,8 @@ def main():
         print('KINOLEL_TEST_PW fehlt – nur Installation geprüft')
     try:
         if umstieg():
+            startzeiten()
+            ken_burns()
             startseite_beobachten()
             abspielen()
             tv_modus()

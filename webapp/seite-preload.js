@@ -1,37 +1,15 @@
 // KinoLel für Windows – läuft in kinolel.de vor den Skripten der Seite:
 //  1. Oberfläche wählen: Fenster = Desktop, „KinoLel (TV-Modus)“ = TV (jellyfin-web liest „layout“ aus dem localStorage)
+//     (Leistungsregeln spielt das Hauptprogramm asynchron ein, siehe main.js)
 //  2. dem Hauptprogramm melden, wann das Startbild weg darf: sobald das gleich aussehende Lade-Overlay von kinolel.de
 //     gezeichnet ist („overlay“) – ohne Overlay erst, wenn eine Seite fertig ist („fertig“). Nie halb aufgebaut.
 const { ipcRenderer } = require('electron');
 
 try {
-  const layout = ipcRenderer.sendSync('kinolel-layout');
+  // Fenster = Desktop, „KinoLel (TV-Modus)“ = TV – kommt als Startargument (kein Warten auf das Hauptprogramm)
+  const arg = (process.argv || []).find((a) => a.startsWith('--kinolel-layout='));
+  const layout = arg ? arg.split('=')[1] : 'desktop';
   if (localStorage.getItem('layout') !== layout) localStorage.setItem('layout', layout);
-} catch (_) { /* nie stören */ }
-
-// Leistung (wie bisher in der App, Lel 16./17.10.): Ken-Burns-Zoom der Media Bar aus; ohne Grafikkarte zusätzlich die
-// Weichzeichner und die laufende Fortschrittsleiste des Karussells (ließ ohne GPU die ganze Seite dauernd neu zeichnen,
-// 66 % statt 24 % CPU). Die Punkte unter dem Karussell zeigen weiter, welcher Titel läuft.
-try {
-  const leistung = ipcRenderer.sendSync('kinolel-leistung');
-  if (leistung.an) {
-    let stil = '.backdrop.high-quality{animation:none!important}';
-    if (leistung.ohneGpu) {
-      stil += '*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}';
-      stil += '.spec-rail,.spec-progress{display:none!important}';
-    }
-    const einfuegen = () => {
-      if (document.getElementById('kinolel-app-leistung')) return;
-      const element = document.createElement('style');
-      element.id = 'kinolel-app-leistung';
-      element.textContent = stil;
-      (document.head || document.documentElement).appendChild(element);
-    };
-    window.addEventListener('DOMContentLoaded', einfuegen);
-    document.addEventListener('animationstart', (e) => {
-      if (/ken.?burns/i.test(e.animationName) && e.target && e.target.style) e.target.style.animation = 'none';
-    }, true);
-  }
 } catch (_) { /* nie stören */ }
 
 let gemeldet = false;
@@ -47,6 +25,18 @@ function fertig() {
   }
   return true;
 }
+// Für die Startzeiten: wann ist kinolel.de wirklich fertig (Overlay weg, Seite steht)?
+let fertigGemeldet = false;
+function fertigBeobachten() {
+  if (fertigGemeldet) return;
+  if (!document.getElementById('kinolel-lade') && fertig()) {
+    fertigGemeldet = true;
+    ipcRenderer.send('kinolel-seite-stand', 'startseite');
+    return;
+  }
+  setTimeout(fertigBeobachten, 100);
+}
+
 function pruefen() {
   if (gemeldet) return;
   if (document.getElementById('kinolel-lade')) {
@@ -65,4 +55,4 @@ const beobachter = new MutationObserver(() => {
   }
 });
 beobachter.observe(document, { childList: true, subtree: true });
-window.addEventListener('DOMContentLoaded', () => { beobachter.disconnect(); pruefen(); });
+window.addEventListener('DOMContentLoaded', () => { beobachter.disconnect(); pruefen(); fertigBeobachten(); });

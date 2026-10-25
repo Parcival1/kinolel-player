@@ -1,6 +1,21 @@
 {
   "versionen": [
     {
+      "version": "0.3.1",
+      "de": [
+        "Das Karussell auf der Startseite zoomt wieder langsam ins Bild.",
+        "KinoLel startet schneller."
+      ],
+      "hu": [
+        "A kezdőlap körhintája ismét lassan ráközelít a képre.",
+        "A KinoLel gyorsabban indul."
+      ],
+      "en": [
+        "The carousel on the home screen zooms slowly into the picture again.",
+        "KinoLel starts faster."
+      ]
+    },
+    {
       "version": "0.3.0",
       "de": [
         "KinoLel für Windows ist neu gebaut: Im Hintergrund läuft jetzt Chrome (Chromium) – dieselbe Technik wie im Browser. Kein Flackern mehr, flüssiger, auch ohne Grafikkarte.",
