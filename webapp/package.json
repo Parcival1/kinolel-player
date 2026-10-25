@@ -1,0 +1,11 @@
+{
+  "name": "kinolel",
+  "productName": "KinoLel",
+  "version": "0.3.0",
+  "private": true,
+  "description": "KinoLel für Windows – Hülle um https://kinolel.de mit eigenem Chromium (Electron)",
+  "main": "main.js",
+  "devDependencies": {
+    "electron": "45.0.0"
+  }
+}

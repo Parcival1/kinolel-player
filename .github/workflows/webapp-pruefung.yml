@@ -1,0 +1,50 @@
+# KinoLel Windows als Web-App (Lel 25.10.2026: „… eine web app … basiere unseres bitte auf Chrome“) – Vorprüfung:
+# Electron (eigenes Chromium) auf einem Windows-Runner ohne GPU: Formate, GPU-Dekoder, kinolel.de mit Anmeldung
+# (Hilfskonto, Passwort = Secret KINOLEL_TEST_PW, nie getippt/ausgegeben), JavaScript-Fehler, CPU im Leerlauf.
+name: webapp-pruefung
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - webapp
+    paths:
+      - webapp/**
+      - bundle/test/startseite.py
+      - .github/workflows/webapp-pruefung.yml
+
+permissions:
+  contents: read
+
+jobs:
+  pruefung:
+    name: Electron unter Windows (ohne GPU)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Electron holen
+        working-directory: webapp
+        run: npm install --no-audit --no-fund
+
+      - name: Python-Werkzeuge
+        run: pip install --quiet websocket-client psutil pillow
+
+      - name: Prüfung
+        env:
+          KINOLEL_TEST_PW: ${{ secrets.KINOLEL_TEST_PW }}
+        run: python webapp/test/pruefung_webapp.py webapp/node_modules/electron/dist/electron.exe webapp pruefung
+
+      - name: Ergebnis hochladen
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: webapp-pruefung
+          path: pruefung/
+          retention-days: 3
+          if-no-files-found: ignore
