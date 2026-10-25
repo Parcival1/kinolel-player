@@ -72,10 +72,27 @@ function speichern() {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Sprache der App-Texte: Windows-Sprache (Deutsch/Ungarisch, sonst Englisch)
-function sprache() {
-  const s = (app.getPreferredSystemLanguages()[0] || app.getLocale() || 'de').slice(0, 2).toLowerCase();
+// Sprache der App-Texte (Lel 25.10.: wie in KinoLel gewählt): die Sprache, die kinolel.de anzeigt (KinoLel-Wahl
+// Deutsch/Magyar bzw. Jellyfins Anzeigesprache, gemeldet über <html lang>); noch nicht bekannt: Windows-Sprache, sonst Englisch
+const SPRACHEN = ['de', 'hu', 'en'];
+function systemSprache() {
+  const s = (app.getPreferredSystemLanguages()[0] || app.getLocale() || 'en').slice(0, 2).toLowerCase();
   return ['de', 'hu'].includes(s) ? s : 'en';
+}
+function sprache() {
+  return SPRACHEN.includes(einst.seiteSprache) ? einst.seiteSprache : systemSprache();
+}
+const spracheWartende = [];
+ipcMain.on('kinolel-sprache', (e, lang) => {
+  if (!ansichten.seite || e.sender !== ansichten.seite.webContents) return;
+  const s = String(lang || '').slice(0, 2).toLowerCase();
+  if (!SPRACHEN.includes(s)) return;
+  if (einst.seiteSprache !== s) { einst.seiteSprache = s; speichern(); log('Sprache von kinolel.de:', s); }
+  spracheWartende.splice(0).forEach((r) => r());
+});
+function aufSpracheWarten(frist) {
+  if (SPRACHEN.includes(einst.seiteSprache)) return Promise.resolve();
+  return new Promise((fertig) => { spracheWartende.push(fertig); setTimeout(fertig, frist); });
 }
 const TEXTE = {
   de: {
@@ -324,6 +341,8 @@ async function neuigkeitenZeigen() {
   if (gesehen && !neuer(aktuell, gesehen)) return;
   einst.gesehen = aktuell;
   speichern();
+  // in der Sprache von kinolel.de zeigen – nach einem Update erst darauf warten (höchstens 15 s)
+  await aufSpracheWarten(15000);
   const eintraege = NEUIGKEITEN.versionen.filter((e) => (!gesehen || neuer(e.version, gesehen)) && !neuer(e.version, aktuell));
   if (!eintraege.length) return;
   const punkte = eintraege.flatMap((e) => e[sprache()] || e.de);

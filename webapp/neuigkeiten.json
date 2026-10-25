@@ -1,6 +1,18 @@
 {
   "versionen": [
     {
+      "version": "0.3.2",
+      "de": [
+        "Meldungen der App (zum Beispiel diese hier und Hinweise zu Updates) erscheinen jetzt in der Sprache, die du in KinoLel gewählt hast. Außerdem Fehlerbehebungen und Verbesserungen."
+      ],
+      "hu": [
+        "Az alkalmazás üzenetei (például ez, és a frissítésekről szóló értesítések) most a KinoLelben kiválasztott nyelven jelennek meg. Emellett hibajavítások és fejlesztések."
+      ],
+      "en": [
+        "App messages (like this one and update notices) now appear in the language you chose in KinoLel. Also bug fixes and improvements."
+      ]
+    },
+    {
       "version": "0.3.1",
       "de": [
         "Das Karussell auf der Startseite zoomt wieder langsam ins Bild, und KinoLel startet schneller. Außerdem Fehlerbehebungen und Verbesserungen."

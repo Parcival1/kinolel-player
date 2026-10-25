@@ -340,6 +340,9 @@ def umstieg():
         anmeldefelder_leeren(cdp)
     merke('Anmeldung in der alten App', angemeldet, ergebnis.get('fehler_alt', ''))
     warten(cdp, STARTSEITE_BEREIT, time.time() + 60)
+    # Lel 25.10.: KinoLel auf Ungarisch (wie „Magyar“ auf der Anmeldeseite, nur auf diesem Gerät), Windows auf Englisch
+    # -> nach dem Update muss „Was ist neu“ ungarisch kommen
+    cdp.js("localStorage.setItem('kl-sprache','hu'); true")
     time.sleep(5)
     beenden(sanft=True)
     if not angemeldet:
@@ -377,6 +380,7 @@ def umstieg():
     text = dialog_text(d) if d else ''
     import re as _re
     merke('„Was ist neu“ nach dem Umstieg', d and _re.search(r'KinoLel 0\.3\.\d', text), text[:160])
+    merke('„Was ist neu“ in der KinoLel-Sprache (Ungarisch, Windows Englisch)', d and 'Újdonságok' in text, text[:60])
     if d:
         d.js("document.getElementById('kinolel-ok').click()")
     ok = warten(cdp, STARTSEITE_BEREIT, time.time() + 60)

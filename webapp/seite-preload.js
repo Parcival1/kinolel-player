@@ -56,4 +56,11 @@ const beobachter = new MutationObserver(() => {
   }
 });
 beobachter.observe(document, { childList: true, subtree: true });
-window.addEventListener('DOMContentLoaded', () => { beobachter.disconnect(); pruefen(); fertigBeobachten(); });
+window.addEventListener('DOMContentLoaded', () => { beobachter.disconnect(); pruefen(); fertigBeobachten(); spracheMelden(); });
+
+// Sprache, die kinolel.de anzeigt (<html lang>), für die Texte der App melden – auch wenn sie wechselt
+function spracheMelden() {
+  const melden = () => { if (document.documentElement.lang) ipcRenderer.send('kinolel-sprache', document.documentElement.lang); };
+  melden();
+  new MutationObserver(melden).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+}
