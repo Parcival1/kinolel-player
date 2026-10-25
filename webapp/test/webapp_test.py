@@ -104,8 +104,16 @@ def dialog_finden(port, frist):
     return None
 
 
-def dialog_text(d):
-    return d.js("(document.getElementById('titel').textContent||'')+' | '+(document.getElementById('inhalt').textContent||'')") or ''
+def dialog_text(d, frist=8):
+    """Titel | Inhalt des KinoLel-Dialogs – wartet, bis der Inhalt eingetragen ist (kommt kurz nach dem Laden)"""
+    ende = time.time() + frist
+    text = ''
+    while time.time() < ende:
+        text = d.js("(document.getElementById('titel').textContent||'')+' | '+(document.getElementById('inhalt').textContent||'')") or ''
+        if text.strip(' |') and d.js("document.querySelectorAll('#knoepfe button').length > 0 || !!document.querySelector('pre')"):
+            return text
+        time.sleep(0.3)
+    return text
 
 
 def bild(cdp, name):
@@ -284,7 +292,15 @@ def ken_burns():
     if not cdp:
         return merke('Ken-Burns-Zoom im Karussell', False, 'App nicht erreichbar')
     warten(cdp, FERTIG, time.time() + 60)
-    ok = warten(cdp, "document.getAnimations().some(function(x){return x.animationName==='kenBurnsZoomIn'&&x.playState==='running'})", time.time() + 30)
+    diag = cdp.js("""(function(){var b=document.querySelector('.backdrop');return {reduziert: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      backdrop_klassen: b ? b.className : null, animate: document.querySelectorAll('.backdrop.animate').length,
+      trailer: document.querySelectorAll('#slides-container video, #slides-container iframe').length,
+      laufend: document.getAnimations().map(function(a){return a.animationName||a.constructor.name}).slice(0,12)}})()""") or {}
+    print('Ken-Burns Diagnose:', json.dumps(diag, ensure_ascii=False))
+    if diag.get('reduziert'):
+        # Windows Server meldet „Animationen reduzieren“ – für den Nachweis wie auf einem normalen PC abschalten
+        cdp.rufe('Emulation.setEmulatedMedia', features=[{'name': 'prefers-reduced-motion', 'value': 'no-preference'}])
+    ok = warten(cdp, "document.getAnimations().some(function(x){return x.animationName==='kenBurnsZoomIn'&&x.playState==='running'})", time.time() + 40)
     vorher = cdp.js(KENBURNS) or {}
     bild(cdp, '04a-karussell-zoom')
     time.sleep(3)
@@ -298,7 +314,7 @@ def ken_burns():
             return None
     s1, s2 = skala(vorher.get('transform') or ''), skala(nachher.get('transform') or '')
     merke('Ken-Burns-Zoom im Karussell läuft (Bild wird größer)', ok and s1 and s2 and s2 > s1,
-          f'Maßstab {s1} -> {s2} in 3 s')
+          f"Maßstab {s1} -> {s2} in 3 s; Windows „Animationen reduzieren“: {diag.get('reduziert')}, Hintergrund: {diag.get('backdrop_klassen')}")
     beenden(sanft=True)
 
 
@@ -359,7 +375,8 @@ def umstieg():
         cdp.rufe(d)
     d = dialog_finden(PORT, 20)
     text = dialog_text(d) if d else ''
-    merke('„Was ist neu“ nach dem Umstieg', d and '0.3.0' in text, text[:160])
+    import re as _re
+    merke('„Was ist neu“ nach dem Umstieg', d and _re.search(r'KinoLel 0\.3\.\d', text), text[:160])
     if d:
         d.js("document.getElementById('kinolel-ok').click()")
     ok = warten(cdp, STARTSEITE_BEREIT, time.time() + 60)

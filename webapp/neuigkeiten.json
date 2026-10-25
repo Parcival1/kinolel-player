@@ -3,16 +3,13 @@
     {
       "version": "0.3.1",
       "de": [
-        "Das Karussell auf der Startseite zoomt wieder langsam ins Bild.",
-        "KinoLel startet schneller."
+        "Das Karussell auf der Startseite zoomt wieder langsam ins Bild, und KinoLel startet schneller. Außerdem Fehlerbehebungen und Verbesserungen."
       ],
       "hu": [
-        "A kezdőlap körhintája ismét lassan ráközelít a képre.",
-        "A KinoLel gyorsabban indul."
+        "A kezdőlap körhintája ismét lassan ráközelít a képre, és a KinoLel gyorsabban indul. Emellett hibajavítások és fejlesztések."
       ],
       "en": [
-        "The carousel on the home screen zooms slowly into the picture again.",
-        "KinoLel starts faster."
+        "The carousel on the home screen slowly zooms into the picture again, and KinoLel starts faster. Also bug fixes and improvements."
       ]
     },
     {
