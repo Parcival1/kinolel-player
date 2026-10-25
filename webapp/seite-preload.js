@@ -16,7 +16,7 @@ let gemeldet = false;
 function melden(stand) {
   if (gemeldet) return;
   gemeldet = true;
-  ipcRenderer.send('kinolel-seite-stand', stand);
+  ipcRenderer.send('kinolel-seite-stand', stand, document.visibilityState);
 }
 function fertig() {
   if (!document.querySelector('.page:not(.hide)')) return false;
@@ -40,8 +40,9 @@ function fertigBeobachten() {
 function pruefen() {
   if (gemeldet) return;
   if (document.getElementById('kinolel-lade')) {
-    // zwei Bilder abwarten, damit das Overlay sicher gezeichnet ist
-    requestAnimationFrame(() => requestAnimationFrame(() => melden('overlay')));
+    // sofort melden – nicht auf Animationsbilder warten: die verdeckte Seite bekommt (mit Grafikkarte) keine, bis das
+    // Startbild weg ist (25.10.: Startbild hing so bis zur Notbremse). Gleiche Farbe/Gestaltung, der Tausch fällt nicht auf.
+    melden('overlay');
     return;
   }
   if (fertig()) melden('fertig');

@@ -33,7 +33,7 @@ const TEST_NEUIGKEITEN_SEIT = process.env.KINOLEL_TEST_NEUIGKEITEN_SEIT; // nur 
 const TEST_APPS_LISTE = process.env.KINOLEL_TEST_APPS_LISTE;             // nur Test: andere Versionsliste
 const PRUEF_ABSTAND_MS = 3 * 60 * 60 * 1000;   // Update-Suche alle 3 h, solange offen
 const SPAETER_MS = 4 * 60 * 60 * 1000;          // „Später“ unterdrückt dieselbe Version 4 h
-const START_NOTBREMSE_MS = 20000;               // Startbild spätestens dann weg
+const START_NOTBREMSE_MS = 8000;                // Startbild spätestens dann weg (darunter liegt das gleiche Overlay der Seite)
 
 // Daten wie bisher unter %LOCALAPPDATA%\KinoLel (die Deinstallation fragt dort, ob gelöscht werden soll)
 const DATEN = path.join(process.env.LOCALAPPDATA || app.getPath('appData'), MARKE.name);
@@ -173,8 +173,10 @@ function fensterOeffnen() {
 
   const sicher = { sandbox: true, contextIsolation: true, nodeIntegration: false };
   ansichten.titel = new WebContentsView({ webPreferences: sicher });
-  ansichten.seite = new WebContentsView({ webPreferences: { ...sicher, preload: path.join(__dirname, 'seite-preload.js'),
-    additionalArguments: [`--kinolel-layout=${TV ? 'tv' : 'desktop'}`] } });
+  // backgroundThrottling aus: Solange das Startbild die Seite verdeckt, hielt Chromium (mit Grafikkarte) deren Bilder an –
+  // das Fertig-Signal kam nie, erst die Notbremse nach 20 s gab frei (Lel 25.10.: „auf Windows dauert es 20 sek“)
+  ansichten.seite = new WebContentsView({ webPreferences: { ...sicher, backgroundThrottling: false,
+    preload: path.join(__dirname, 'seite-preload.js'), additionalArguments: [`--kinolel-layout=${TV ? 'tv' : 'desktop'}`] } });
   ansichten.start = new WebContentsView({ webPreferences: sicher });
   for (const v of [ansichten.titel, ansichten.seite, ansichten.start]) v.setBackgroundColor(MARKE.farbeHintergrund);
   fenster.contentView.addChildView(ansichten.titel);
@@ -230,7 +232,7 @@ function startUeberwachen() {
   startBeginn = Date.now();
   notbremse = setTimeout(() => { log('Startbild nach Notbremse entfernt'); startEntfernen(true); }, START_NOTBREMSE_MS);
 }
-ipcMain.on('kinolel-seite-stand', (e, stand) => {
+ipcMain.on('kinolel-seite-stand', (e, stand, sichtbarkeit) => {
   if (!ansichten.seite || e.sender !== ansichten.seite.webContents) return;
   if (stand === 'startseite') {
     // kinolel.de fertig (Lade-Overlay weg, erste Seite steht): Zeiten einmal protokollieren
@@ -244,7 +246,7 @@ ipcMain.on('kinolel-seite-stand', (e, stand) => {
   if (startWeg) return;
   zeit('startbild_weg');
   clearTimeout(notbremse);
-  log('Startbild weg nach', Date.now() - startBeginn, 'ms:', stand);
+  log('Startbild weg nach', Date.now() - startBeginn, 'ms:', stand, `(Seite ${sichtbarkeit || '?'})`);
   startEntfernen(stand !== 'overlay');
 });
 // Strg+Umschalt+G = Grafik-Info, F11 = Vollbild (gilt in jeder Ansicht des Fensters)
