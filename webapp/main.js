@@ -200,6 +200,9 @@ function fensterOeffnen() {
     if (!eigene(url)) { e.preventDefault(); if (/^https?:/i.test(url)) shell.openExternal(url); }
   });
   for (const v of [ansichten.titel, ansichten.seite, ansichten.start]) v.webContents.on('before-input-event', tastenkuerzel);
+  // Vollbild aus der Seite (Doppelklick im Film, Vollbild-Knopf des Players) = ganzes Fenster im Vollbild
+  seite.on('enter-html-full-screen', () => fenster?.setFullScreen(true));
+  seite.on('leave-html-full-screen', () => { if (!TV) fenster?.setFullScreen(false); });
   seite.on('render-process-gone', (_e, d) => { log('Seite abgestürzt:', d.reason); seite.reload(); });
   seite.on('did-fail-load', (_e, code, text, url, haupt) => { if (haupt) log('Laden fehlgeschlagen:', code, text, url); });
   seite.on('did-start-loading', () => { if (startWeg) return; startUeberwachen(); });
@@ -384,9 +387,14 @@ async function installieren(eintrag, neu) {
 // ---------------------------------------------------------------------------------------------------------------
 // Grafik-Diagnose (Strg+Umschalt+G): GPU, Video-Dekoder (HEVC?), Funktionsstatus – auch ins Protokoll
 async function grafikInfo() {
+  log('Grafik-Info angefordert');
   let text = '';
   try {
-    const info = await app.getGPUInfo('complete');
+    // „complete“ kann ohne Grafikkarte lange hängen -> höchstens 4 s, sonst „basic“
+    const info = await Promise.race([
+      app.getGPUInfo('complete'),
+      new Promise((r) => setTimeout(() => r(null), 4000)),
+    ]) || await app.getGPUInfo('basic');
     const geraete = (info.gpuDevice || []).map((g) => `${g.vendorId?.toString(16)}:${g.deviceId?.toString(16)} ${g.driverVendor || ''} ${g.driverVersion || ''} ${g.active ? '(aktiv)' : ''}`.trim());
     const dekoder = [...new Set((info.videoDecoding || info.videoDecodeAcceleratorSupportedProfile || []).map((d) => d.profile ?? d.codec ?? JSON.stringify(d)))];
     text = [
@@ -405,6 +413,15 @@ async function grafikInfo() {
 
 // ---------------------------------------------------------------------------------------------------------------
 ipcMain.on('kinolel-layout', (e) => { e.returnValue = TV ? 'tv' : 'desktop'; });
+// Leistungsregeln (aus der bisherigen App, gemessen mit startseite.py): ohne Grafikkarte zeichnet Chromium jedes Bild in
+// Software – Dauer-Animationen der Media Bar halten dann die CPU beschäftigt. KINOLEL_LEISTUNG=0 schaltet sie ab (Test).
+ipcMain.on('kinolel-leistung', (e) => {
+  const g = app.getGPUFeatureStatus();
+  e.returnValue = {
+    an: process.env.KINOLEL_LEISTUNG !== '0',
+    ohneGpu: /disabled|unavailable/.test(g.gpu_compositing || ''),
+  };
+});
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();

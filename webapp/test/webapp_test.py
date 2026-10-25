@@ -266,8 +266,13 @@ def umstieg():
     merke('Startbild bis kinolel.de übernimmt (Lade-Overlay oder fertige Seite)', zeile and 'Notbremse' not in zeile[-1],
           zeile[-1].split(' ', 1)[-1] if zeile else 'keine Protokollzeile')
     # 3. Grafik-Info
-    nach_vorne_und_tasten(0x11, 0x10, 0x47)  # Strg, Umschalt, G
-    d = dialog_finden(PORT, 15)
+    # über DevTools wie eine Tastatureingabe in der Seite; falls nicht angekommen, echte Tasten
+    cdp.rufe('Input.dispatchKeyEvent', type='rawKeyDown', modifiers=10, key='G', code='KeyG', windowsVirtualKeyCode=71)
+    cdp.rufe('Input.dispatchKeyEvent', type='keyUp', modifiers=10, key='G', code='KeyG', windowsVirtualKeyCode=71)
+    d = dialog_finden(PORT, 12)
+    if not d:
+        nach_vorne_und_tasten(0x11, 0x10, 0x47)  # Strg, Umschalt, G
+        d = dialog_finden(PORT, 12)
     text = d.js("document.querySelector('pre') ? document.querySelector('pre').textContent : ''") if d else ''
     with open(os.path.join(AUS, '03-grafik-info.txt'), 'w', encoding='utf-8') as f:
         f.write(text or '')
@@ -292,6 +297,17 @@ def startseite_beobachten():
         json.dump(teil, f, ensure_ascii=False, indent=1)
     v = (teil.get('varianten') or [{}])[0]
     fl = teil.get('flackern_anmeldung_webapp') or {}
+    # Vergleich ohne Leistungsregeln (Auftrag: nur behalten, wenn sie messbar helfen)
+    beenden(sanft=True)
+    ohne = {'varianten': []}
+    startseite.sitzung('webapp-ohne-leistungsregeln', [EXE], ORDNER, PORT, startseite.VARIANTEN[:1], ohne,
+                       env={'KINOLEL_DEVTOOLS_PORT': str(PORT), 'KINOLEL_LEISTUNG': '0'}, abmelden=False)
+    with open(os.path.join(AUS, 'startseite-ohne-leistungsregeln.json'), 'w', encoding='utf-8') as f:
+        json.dump(ohne, f, ensure_ascii=False, indent=1)
+    vo = (ohne.get('varianten') or [{}])[0]
+    merke('Leistungsregeln (ohne GPU) messbar', True, f"CPU mit {v.get('cpu_prozent')} % / ohne {vo.get('cpu_prozent')} %, "
+          f"GPU-Prozess {(v.get('cpu_je_prozess') or {}).get('gpu-process')} / {(vo.get('cpu_je_prozess') or {}).get('gpu-process')} %, "
+          f"Layout/s {(v.get('hauptthread') or {}).get('LayoutCount_pro_s')} / {(vo.get('hauptthread') or {}).get('LayoutCount_pro_s')}")
     merke('Startseite: keine Neulade-Schleife', v and not v.get('seiten_neu_geladen') and not v.get('abschnitte_neu'),
           f"Seiten neu {v.get('seiten_neu_geladen')}, Abschnitte neu {v.get('abschnitte_neu')}")
     merke('Startseite: kein Flackern im Bildschirmvideo', isinstance(fl, dict) and not fl.get('blitzer'), json.dumps(fl)[:200])
@@ -367,6 +383,17 @@ def abspielen():
     time.sleep(12)
     p2 = cdp.js("ApiClient.getSessions({DeviceId:ApiClient.deviceId()}).then(function(s){return ((s[0]||{}).PlayState||{}).PositionTicks||0})", zeit=20) or 0
     merke('Fortschritt beim Server', p2 > p1, f'{p1 / 1e7:.0f} s -> {p2 / 1e7:.0f} s')
+    # Vollbild aus dem Player (wie Doppelklick) = ganzes Fenster im Vollbild, danach zurück
+    cdp.rufe('Runtime.evaluate', expression="document.documentElement.requestFullscreen().then(function(){return true},function(e){return String(e)})",
+             userGesture=True, awaitPromise=True, returnByValue=True)
+    time.sleep(2)
+    user32 = ctypes.windll.user32
+    breite, hoehe = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+    rechtecke = [r for _, r in fenster_von({p.pid for p in kinolel_prozesse()})]
+    merke('Vollbild aus dem Player: ganzes Fenster', any(r[2] - r[0] >= breite and r[3] - r[1] >= hoehe for r in rechtecke), f'{rechtecke}')
+    cdp.rufe('Runtime.evaluate', expression="document.exitFullscreen().then(function(){return true},function(){return false})",
+             userGesture=True, awaitPromise=True, returnByValue=True)
+    time.sleep(2)
     cdp.js("(function(){var b=document.querySelector('.btnStop');if(b)b.click();else history.back();return true})()")
     time.sleep(3)
     beenden(sanft=True)

@@ -9,6 +9,31 @@ try {
   if (localStorage.getItem('layout') !== layout) localStorage.setItem('layout', layout);
 } catch (_) { /* nie stören */ }
 
+// Leistung (wie bisher in der App, Lel 16./17.10.): Ken-Burns-Zoom der Media Bar aus; ohne Grafikkarte zusätzlich die
+// Weichzeichner und die laufende Fortschrittsleiste des Karussells (ließ ohne GPU die ganze Seite dauernd neu zeichnen,
+// 66 % statt 24 % CPU). Die Punkte unter dem Karussell zeigen weiter, welcher Titel läuft.
+try {
+  const leistung = ipcRenderer.sendSync('kinolel-leistung');
+  if (leistung.an) {
+    let stil = '.backdrop.high-quality{animation:none!important}';
+    if (leistung.ohneGpu) {
+      stil += '*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}';
+      stil += '.spec-rail,.spec-progress{display:none!important}';
+    }
+    const einfuegen = () => {
+      if (document.getElementById('kinolel-app-leistung')) return;
+      const element = document.createElement('style');
+      element.id = 'kinolel-app-leistung';
+      element.textContent = stil;
+      (document.head || document.documentElement).appendChild(element);
+    };
+    window.addEventListener('DOMContentLoaded', einfuegen);
+    document.addEventListener('animationstart', (e) => {
+      if (/ken.?burns/i.test(e.animationName) && e.target && e.target.style) e.target.style.animation = 'none';
+    }, true);
+  }
+} catch (_) { /* nie stören */ }
+
 let gemeldet = false;
 function melden(stand) {
   if (gemeldet) return;
