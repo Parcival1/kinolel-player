@@ -569,14 +569,16 @@ def tv_modus():
     beenden(sanft=True)
 
 
-def update_server(version):
-    """Lokale Versionsliste wie kinolel.de/web/kinolel/apps.json: <version> mit dem Setup dieses Laufs"""
+def update_server(version, port):
+    """Lokale Versionsliste wie kinolel.de/web/kinolel/apps.json: <version> mit dem Setup dieses Laufs.
+    Am Ende shutdown() UND server_close(): sonst lauscht der Socket weiter, und unter Windows (SO_REUSEADDR) bindet ein
+    neuer Server denselben Port – Anfragen bleiben dann am alten hängen."""
     ordner = os.path.join(os.environ.get('RUNNER_TEMP', AUS), 'update-server-' + version)
     os.makedirs(ordner, exist_ok=True)
     datei = f'KinoLel-Setup-{version}-x64.exe'
     shutil.copy(SETUP, os.path.join(ordner, datei))
     with open(os.path.join(ordner, 'apps.json'), 'w', encoding='utf-8') as f:
-        json.dump({'windows': {'version': 'v' + version, 'url': f'http://127.0.0.1:8766/{datei}',
+        json.dump({'windows': {'version': 'v' + version, 'url': f'http://127.0.0.1:{port}/{datei}',
                                'datei': datei, 'seite': 'https://kinolel.de'}}, f)
 
     class Leise(http.server.SimpleHTTPRequestHandler):
@@ -585,7 +587,7 @@ def update_server(version):
 
         def log_message(self, *a):
             pass
-    server = http.server.ThreadingHTTPServer(('127.0.0.1', 8766), Leise)
+    server = http.server.ThreadingHTTPServer(('127.0.0.1', port), Leise)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
@@ -605,7 +607,7 @@ def installierte_version():
 
 def auto_update():
     """7. Versionsliste (lokal) mit 9.9 -> Hinweis -> Jetzt aktualisieren -> Setup still -> KinoLel wieder da"""
-    server = update_server('9.9')
+    server = update_server('9.9', 8766)
     try:
         proc, cdp = app_starten(KINOLEL_TEST_APPS_LISTE='http://127.0.0.1:8766/apps.json')
         d = dialog_finden(PORT, 40)
@@ -630,6 +632,7 @@ def auto_update():
         for quelle in glob.glob(os.path.join(os.environ.get('TEMP', ''), 'KinoLel-Update.log')):
             shutil.copy(quelle, os.path.join(AUS, 'update-setup.log'))
         server.shutdown()
+        server.server_close()
         beenden(sanft=True)
 
 
@@ -639,10 +642,10 @@ def von_vorgaenger():
     beenden()
     vor_setup = os.path.join(os.environ.get('RUNNER_TEMP', AUS), f'KinoLel-Setup-{VORGAENGER[1:]}-x64.exe')
     urllib.request.urlretrieve(f'https://github.com/Parcival1/kinolel-player/releases/download/{VORGAENGER}/KinoLel-Setup-{VORGAENGER[1:]}-x64.exe', vor_setup)
-    server = update_server(VERSION_NEU)
+    server = update_server(VERSION_NEU, 8767)
     try:
         # Umgebung erbt das Setup und darüber die App, die es danach startet (DevTools, Versionsliste, „zuletzt gesehen“)
-        env = umgebung(KINOLEL_DEVTOOLS_PORT=PORT, KINOLEL_TEST_APPS_LISTE='http://127.0.0.1:8766/apps.json',
+        env = umgebung(KINOLEL_DEVTOOLS_PORT=PORT, KINOLEL_TEST_APPS_LISTE='http://127.0.0.1:8767/apps.json',
                        KINOLEL_TEST_NEUIGKEITEN_SEIT=VORGAENGER[1:])
         rc = setup_still(vor_setup, 'vorgaenger', env=env)
         merke(f'{VORGAENGER} installiert (wie bei Lel)', rc == 0 and installierte_version() == VORGAENGER[1:],
@@ -679,6 +682,7 @@ def von_vorgaenger():
         for quelle in glob.glob(os.path.join(os.environ.get('TEMP', ''), 'KinoLel-Update.log')):
             shutil.copy(quelle, os.path.join(AUS, 'update-vorgaenger-setup.log'))
         server.shutdown()
+        server.server_close()
         beenden(sanft=True)
 
 
