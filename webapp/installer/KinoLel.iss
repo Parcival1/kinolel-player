@@ -100,6 +100,38 @@ Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: WizardSilent
 var
   RemoveUserData: Boolean;
 
+function KinoLelLaeuft: Boolean;
+var
+  Locator, Dienst, Liste: Variant;
+begin
+  Result := False;
+  try
+    Locator := CreateOleObject('WbemScripting.SWbemLocator');
+    Dienst := Locator.ConnectServer('.', 'root\CIMV2');
+    Liste := Dienst.ExecQuery('SELECT ProcessId FROM Win32_Process WHERE Name = ''KinoLel.exe''');
+    Result := Liste.Count > 0;
+  except
+    Result := False;
+  end;
+end;
+
+// Auto-Update: Die App startet das Setup still und beendet sich dann selbst. Bis zu 30 s darauf warten – sonst
+// versucht Windows (Restart Manager), sie zu schließen, und Inno bricht im stillen Modus ab.
+function InitializeSetup(): Boolean;
+var
+  i: Integer;
+begin
+  i := 0;
+  if WizardSilent then
+    while KinoLelLaeuft and (i < 60) do
+    begin
+      Sleep(500);
+      i := i + 1;
+    end;
+  if i > 0 then Log(Format('Auf das Beenden von KinoLel gewartet: %d ms', [i * 500]));
+  Result := True;
+end;
+
 // Umstieg von der bisherigen Qt-App: deren Programmdateien vor dem Kopieren entfernen (nur dann – spätere Updates
 // überschreiben einfach, damit ein abgebrochenes Update nie eine leere Installation hinterlässt).
 // Nur Programmdateien – Einstellungen/Anmeldung liegen unter %LOCALAPPDATA%.

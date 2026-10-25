@@ -32,4 +32,12 @@ function pruefen() {
   if (fertig()) melden('fertig');
   else setTimeout(pruefen, 150);
 }
-window.addEventListener('DOMContentLoaded', pruefen);
+// Das Lade-Overlay steht ganz oben in index.html: schon beim Einlesen bemerken (nicht erst, wenn alle Skripte geladen sind)
+const beobachter = new MutationObserver(() => {
+  if (document.getElementById('kinolel-lade')) {
+    beobachter.disconnect();
+    pruefen();
+  }
+});
+beobachter.observe(document, { childList: true, subtree: true });
+window.addEventListener('DOMContentLoaded', () => { beobachter.disconnect(); pruefen(); });

@@ -159,6 +159,13 @@ def nach_vorne_und_tasten(*tasten):
     user32.keybd_event(0x12, 0, 0, 0)  # Alt: Windows erlaubt dann das Vorholen
     user32.SetForegroundWindow(ziel[0])
     user32.keybd_event(0x12, 0, 2, 0)
+    time.sleep(0.5)
+    # einmal in die Titelleiste (links, neben „KinoLel“) klicken: Tastatur geht dann sicher an das Fenster
+    r = wt.RECT()
+    user32.GetWindowRect(ziel[0], ctypes.byref(r))
+    user32.SetCursorPos(r.left + 200, r.top + 18)
+    user32.mouse_event(0x0002, 0, 0, 0, 0)
+    user32.mouse_event(0x0004, 0, 0, 0, 0)
     time.sleep(1)
     for vk in tasten:
         user32.keybd_event(vk, 0, 0, 0)
