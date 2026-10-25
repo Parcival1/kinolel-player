@@ -35,6 +35,8 @@ app.setPath('userData', path.join(DATEN, 'App'));
 app.setName(MARKE.name);
 app.setAppUserModelId(MARKE.appUserModelId);
 if (DEVTOOLS_PORT) app.commandLine.appendSwitch('remote-debugging-port', DEVTOOLS_PORT);
+// Abspielen ohne vorherigen Klick: Fernsteuerung vom Server, nächste Folge, TV-Modus mit Fernbedienung
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 // wie Chrome, mit „KinoLel/<Version>“, ohne „Electron“
 app.userAgentFallback = app.userAgentFallback.replace(/\s*Electron\/\S+/i, '');
 Menu.setApplicationMenu(null);
@@ -197,11 +199,7 @@ function fensterOeffnen() {
   seite.on('will-navigate', (e, url) => {
     if (!eigene(url)) { e.preventDefault(); if (/^https?:/i.test(url)) shell.openExternal(url); }
   });
-  seite.on('before-input-event', (e, ein) => {
-    if (ein.type !== 'keyDown') return;
-    if (ein.control && ein.shift && ein.code === 'KeyG') { e.preventDefault(); grafikInfo(); }
-    if (ein.code === 'F11' && !TV) { e.preventDefault(); fenster.setFullScreen(!fenster.isFullScreen()); }
-  });
+  for (const v of [ansichten.titel, ansichten.seite, ansichten.start]) v.webContents.on('before-input-event', tastenkuerzel);
   seite.on('render-process-gone', (_e, d) => { log('Seite abgestürzt:', d.reason); seite.reload(); });
   seite.on('did-fail-load', (_e, code, text, url, haupt) => { if (haupt) log('Laden fehlgeschlagen:', code, text, url); });
   seite.on('did-start-loading', () => { if (startWeg) return; startUeberwachen(); });
@@ -209,43 +207,36 @@ function fensterOeffnen() {
 }
 
 // Startbild erst weg, wenn kinolel.de sein eigenes (gleich aussehendes) Lade-Overlay zeigt oder fertig ist –
-// nie ein halb aufgebauter Bildschirm (Lel 25.10.)
-let ueberwachung = null;
+// nie ein halb aufgebauter Bildschirm (Lel 25.10.). Die Seite meldet das selbst (seite-preload.js); Notbremse 20 s.
+let startBeginn = 0;
+let notbremse = null;
 function startUeberwachen() {
-  if (ueberwachung) return;
-  const beginn = Date.now();
-  const pruefung = `(function(){
-    var l = document.getElementById('kinolel-lade');
-    if (l) return l.getBoundingClientRect().width > 0 && getComputedStyle(l).visibility !== 'hidden' ? 'overlay' : false;
-    if (!document.querySelector('.page:not(.hide)')) return false;
-    if (/^#\\/home/.test(location.hash) || location.hash === '' || location.hash === '#/')
-      return document.querySelectorAll('#indexPage:not(.hide) .verticalSection, #indexPage:not(.hide) .homeSection').length > 0 ? 'fertig' : false;
-    return 'fertig';
-  })()`;
-  ueberwachung = setInterval(async () => {
-    if (!fenster) return clearInterval(ueberwachung);
-    let stand = false;
-    try { stand = await ansichten.seite.webContents.executeJavaScript(pruefung); } catch (_) { stand = false; }
-    const notbremse = Date.now() - beginn > START_NOTBREMSE_MS;
-    if (!stand && !notbremse) return;
-    clearInterval(ueberwachung);
-    ueberwachung = null;
-    if (stand === 'overlay') {
-      // ein Bild abwarten, damit das Overlay der Seite sicher gezeichnet ist, dann tauschen
-      try { await ansichten.seite.webContents.executeJavaScript('new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r)})})'); } catch (_) {}
-      startEntfernen(false);
-    } else {
-      if (notbremse) log('Startbild nach Notbremse entfernt');
-      startEntfernen(true);
-    }
-    log('Startbild weg nach', Date.now() - beginn, 'ms', stand || 'Notbremse');
-  }, 150);
+  if (notbremse) return;
+  startBeginn = Date.now();
+  notbremse = setTimeout(() => { log('Startbild nach Notbremse entfernt'); startEntfernen(true); }, START_NOTBREMSE_MS);
 }
+ipcMain.on('kinolel-seite-stand', (e, stand) => {
+  if (startWeg || !ansichten.seite || e.sender !== ansichten.seite.webContents) return;
+  clearTimeout(notbremse);
+  log('Startbild weg nach', Date.now() - startBeginn, 'ms:', stand);
+  startEntfernen(stand !== 'overlay');
+});
+// Strg+Umschalt+G = Grafik-Info, F11 = Vollbild (gilt in jeder Ansicht des Fensters)
+function tastenkuerzel(e, ein) {
+  if (ein.type !== 'keyDown') return;
+  if (ein.control && ein.shift && ein.code === 'KeyG') { e.preventDefault(); grafikInfo(); }
+  if (ein.code === 'F11' && !TV && fenster) { e.preventDefault(); fenster.setFullScreen(!fenster.isFullScreen()); }
+}
+
 function startEntfernen(sanft) {
   if (startWeg || !ansichten.start) return;
   startWeg = true;
   const v = ansichten.start;
-  const weg = () => { try { fenster?.contentView.removeChildView(v); v.webContents.close(); } catch (_) {} ansichten.start = null; };
+  const weg = () => {
+    try { fenster?.contentView.removeChildView(v); v.webContents.close(); } catch (_) {}
+    ansichten.start = null;
+    ansichten.seite?.webContents.focus();
+  };
   if (!sanft) return weg();
   v.webContents.executeJavaScript("document.getElementById('kinolel-lade').classList.add('kinolel-weg')").catch(() => {});
   setTimeout(weg, 480);
@@ -375,8 +366,13 @@ async function installieren(eintrag, neu) {
     await new Promise((r) => datei.end(r));
     log('Update geladen:', ziel, geladen, 'Bytes');
     // still installieren wie bisher (Inno Setup); der Installer startet KinoLel danach wieder
-    spawn(ziel, ['/SILENT', '/SP-', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS'], { detached: true, stdio: 'ignore' }).unref();
-    setTimeout(() => app.quit(), 500);
+    const protokoll = path.join(os.tmpdir(), 'KinoLel-Update.log');
+    const setup = spawn(ziel, ['/SILENT', '/SP-', '/SUPPRESSMSGBOXES', '/NORESTART', '/CLOSEAPPLICATIONS', `/LOG=${protokoll}`],
+      { detached: true, stdio: 'ignore' });
+    await new Promise((gestartet, fehler) => { setup.once('spawn', gestartet); setup.once('error', fehler); });
+    setup.unref();
+    log('Setup gestartet (Protokoll', protokoll + ')');
+    setTimeout(() => app.quit(), 1500);
   } catch (e) {
     log('Update fehlgeschlagen:', e.message);
     if (dialogAnsicht) dialogBeenden(dialogAnsicht, 'fehler');

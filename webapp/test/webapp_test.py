@@ -140,6 +140,34 @@ def fenster_von(pids):
     return aus
 
 
+def nach_vorne_und_tasten(*tasten):
+    """KinoLel-Fenster nach vorne holen und echte Tasten drücken (wie ein Mensch, nicht über DevTools)"""
+    user32 = ctypes.windll.user32
+    ziel = []
+    pids = {p.pid for p in kinolel_prozesse()}
+
+    @ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
+    def je(hwnd, _):
+        pid = wt.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value in pids and user32.IsWindowVisible(hwnd) and user32.GetWindowTextLengthW(hwnd):
+            ziel.append(hwnd)
+        return True
+    user32.EnumWindows(je, 0)
+    if not ziel:
+        return False
+    user32.keybd_event(0x12, 0, 0, 0)  # Alt: Windows erlaubt dann das Vorholen
+    user32.SetForegroundWindow(ziel[0])
+    user32.keybd_event(0x12, 0, 2, 0)
+    time.sleep(1)
+    for vk in tasten:
+        user32.keybd_event(vk, 0, 0, 0)
+        time.sleep(0.05)
+    for vk in reversed(tasten):
+        user32.keybd_event(vk, 0, 2, 0)
+    return True
+
+
 def app_starten(*args, **env):
     beenden()
     proc = subprocess.Popen([EXE, *args], cwd=ORDNER, env=umgebung(KINOLEL_DEVTOOLS_PORT=PORT, **env))
@@ -230,8 +258,7 @@ def umstieg():
     merke('Startbild bis kinolel.de übernimmt (Lade-Overlay oder fertige Seite)', zeile and 'Notbremse' not in zeile[-1],
           zeile[-1].split(' ', 1)[-1] if zeile else 'keine Protokollzeile')
     # 3. Grafik-Info
-    cdp.rufe('Input.dispatchKeyEvent', type='rawKeyDown', modifiers=10, key='G', code='KeyG', windowsVirtualKeyCode=71)
-    cdp.rufe('Input.dispatchKeyEvent', type='keyUp', modifiers=10, key='G', code='KeyG', windowsVirtualKeyCode=71)
+    nach_vorne_und_tasten(0x11, 0x10, 0x47)  # Strg, Umschalt, G
     d = dialog_finden(PORT, 15)
     text = d.js("document.querySelector('pre') ? document.querySelector('pre').textContent : ''") if d else ''
     with open(os.path.join(AUS, '03-grafik-info.txt'), 'w', encoding='utf-8') as f:
@@ -394,7 +421,10 @@ def auto_update():
             neu = [p for p in kinolel_prozesse() if p.pid != alt_pid]
             time.sleep(2)
         merke('Update: Setup lief still, KinoLel startet wieder', bool(neu))
+        merke('Update: KinoLel danach vollständig installiert', os.path.exists(EXE) and os.path.exists(os.path.join(ORDNER, 'resources', 'app.asar')))
     finally:
+        for quelle in glob.glob(os.path.join(os.environ.get('TEMP', ''), 'KinoLel-Update.log')):
+            shutil.copy(quelle, os.path.join(AUS, 'update-setup.log'))
         server.shutdown()
         beenden(sanft=True)
 

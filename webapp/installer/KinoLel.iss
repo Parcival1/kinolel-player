@@ -100,15 +100,16 @@ Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: WizardSilent
 var
   RemoveUserData: Boolean;
 
-// Vor dem Kopieren: alte Programmdateien im Installationsordner entfernen (bisherige Qt-App bzw. ältere Version),
-// damit nichts Veraltetes liegen bleibt. Nur Programmdateien – Einstellungen/Anmeldung liegen unter %LOCALAPPDATA%.
+// Umstieg von der bisherigen Qt-App: deren Programmdateien vor dem Kopieren entfernen (nur dann – spätere Updates
+// überschreiben einfach, damit ein abgebrochenes Update nie eine leere Installation hinterlässt).
+// Nur Programmdateien – Einstellungen/Anmeldung liegen unter %LOCALAPPDATA%.
 procedure AlteProgrammdateienEntfernen;
 var
   Rec: TFindRec;
   Ordner: String;
 begin
   Ordner := ExpandConstant('{app}');
-  if not (FileExists(Ordner + '\{#MyAppExeName}') or FileExists(Ordner + '\Qt6Core.dll')) then Exit;
+  if not FileExists(Ordner + '\Qt6Core.dll') then Exit;
   if FindFirst(Ordner + '\*', Rec) then
   try
     repeat
@@ -123,7 +124,7 @@ begin
   finally
     FindClose(Rec);
   end;
-  Log('Alte Programmdateien entfernt: ' + Ordner);
+  Log('Programmdateien der bisherigen Qt-App entfernt: ' + Ordner);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
