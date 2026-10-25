@@ -226,8 +226,9 @@ ipcMain.on('kinolel-seite-stand', (e, stand) => {
 });
 // Strg+Umschalt+G = Grafik-Info, F11 = Vollbild (gilt in jeder Ansicht des Fensters)
 function tastenkuerzel(e, ein) {
-  if (ein.type !== 'keyDown') return;
-  if (ein.control && ein.shift && ein.code === 'KeyG') { e.preventDefault(); grafikInfo(); }
+  if (ein.type !== 'keyDown' && ein.type !== 'rawKeyDown') return;
+  if (DEVTOOLS_PORT && ein.control && ein.shift) log('Taste (Test):', ein.type, ein.code, ein.key);
+  if (ein.control && ein.shift && (ein.code === 'KeyG' || String(ein.key).toLowerCase() === 'g')) { e.preventDefault(); grafikInfo(); }
   if (ein.code === 'F11' && !TV && fenster) { e.preventDefault(); fenster.setFullScreen(!fenster.isFullScreen()); }
 }
 

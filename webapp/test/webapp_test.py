@@ -363,15 +363,18 @@ def abspielen():
     time.sleep(6)
     pos = cdp.js("ApiClient.getSessions({DeviceId:ApiClient.deviceId()}).then(function(s){return ((s[0]||{}).PlayState||{}).PositionTicks||0})", zeit=20) or 0
     merke('Spulen mit der Tastatur', pos / 1e7 > (vorher or 0) + 15, f'{vorher:.0f} s -> {pos / 1e7:.0f} s (Server)')
-    # Tonspur wechseln über das Menü der Leiste
-    ton_vorher = zustand.get('ton')
+    # Tonspur wechseln über das Menü der Leiste: Ziel = eine andere Tonspur des Films als die gerade laufende
+    ton_vorher = cdp.js("ApiClient.getSessions({DeviceId:ApiClient.deviceId()}).then(function(s){return ((s[0]||{}).PlayState||{}).AudioStreamIndex})", zeit=20)
+    ziel = cdp.js("ApiClient.getItem(ApiClient.getCurrentUserId(),%s).then(function(i){var s=((i.MediaSources||[])[0]||{}).MediaStreams||[];"
+                  "var a=s.filter(function(x){return x.Type==='Audio'&&x.Index!==%s});return a.length?(a[0].DisplayTitle||a[0].Language||''):null})"
+                  % (json.dumps(film), json.dumps(ton_vorher)), zeit=20)
     cdp.rufe('Input.dispatchMouseEvent', type='mouseMoved', x=700, y=500)
     time.sleep(1)
     cdp.js("(function(){var b=document.querySelector('.btnAudio');if(b)b.click();return !!b})()")
     time.sleep(1.5)
-    gewaehlt = cdp.js("(function(){var e=[].slice.call(document.querySelectorAll('.actionSheetMenuItem'));"
-                      "var andere=e.filter(function(x){return !x.querySelector('.check, .actionSheetItemAsideText')||!/check/.test(x.innerHTML)});"
-                      "var z=e.filter(function(x){return x.innerHTML.indexOf('check')<0})[0]||e[1];if(z){z.click();return z.textContent.trim()}return null})()")
+    gewaehlt = cdp.js("(function(z){var e=[].slice.call(document.querySelectorAll('.actionSheetMenuItem'));"
+                      "var k=e.filter(function(x){return z&&x.textContent.indexOf(z.slice(0,12))>=0})[0];if(k){k.click();return k.textContent.trim()}"
+                      "return null})(%s)" % json.dumps(ziel))
     ton_nachher = ton_vorher
     ende = time.time() + 40
     while time.time() < ende and ton_nachher == ton_vorher:
