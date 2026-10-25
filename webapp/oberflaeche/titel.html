@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<!-- KinoLel für Windows: Titelleiste #0B0F18 – Fenster damit verschieben (Andocken/Snap), rechts die echten
+     Windows-Knöpfe (titleBarOverlay, inkl. Snap-Layouts beim Überfahren von „Maximieren“). -->
+<html lang="de"><head><meta charset="utf-8"><title>KinoLel</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0f18; overflow: hidden; user-select: none; cursor: default; }
+  body { display: flex; align-items: center; gap: 9px; padding-left: 14px; -webkit-app-region: drag;
+         font: 600 13px "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: #e8eaf6; letter-spacing: .2px; }
+  svg { width: 22px; height: 14px; }
+  body.inaktiv { color: #8c90a8; }
+  body.inaktiv svg path { fill: #8c90a8; }
+</style></head>
+<body>
+  <svg viewBox="0 0 677 433" aria-hidden="true"><path fill="#fff" fill-rule="evenodd" d="M22,0H655A22,22 0 0 1 677,22V411A22,22 0 0 1 655,433H22A22,22 0 0 1 0,411V22A22,22 0 0 1 22,0ZM64,45H613A14,14 0 0 1 627,59V374A14,14 0 0 1 613,388H64A14,14 0 0 1 50,374V59A14,14 0 0 1 64,45ZM241,216A97,97 0 1 0 435,216A97,97 0 1 0 241,216ZM308,156L401,216L308,279Z"/></svg>
+  <span>KinoLel</span>
+</body></html>

@@ -1,0 +1,10 @@
+{
+  "name": "KinoLel",
+  "server": "https://kinolel.de",
+  "appsListe": "https://kinolel.de/web/kinolel/apps.json",
+  "updateSchluessel": "windows",
+  "releaseSeite": "https://github.com/Parcival1/kinolel-player/releases/latest",
+  "appUserModelId": "de.kinolel.windows",
+  "farbeHintergrund": "#0B0F18",
+  "farbeSymbole": "#C9CCE0"
+}

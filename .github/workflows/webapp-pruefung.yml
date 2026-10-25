@@ -9,8 +9,7 @@ on:
     branches:
       - webapp
     paths:
-      - webapp/**
-      - bundle/test/startseite.py
+      - webapp/test/pruefung_webapp.py
       - .github/workflows/webapp-pruefung.yml
 
 permissions:

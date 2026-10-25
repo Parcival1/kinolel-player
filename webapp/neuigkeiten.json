@@ -1,0 +1,22 @@
+{
+  "versionen": [
+    {
+      "version": "0.3.0",
+      "de": [
+        "KinoLel für Windows ist neu gebaut: Im Hintergrund läuft jetzt Chrome (Chromium) – dieselbe Technik wie im Browser. Kein Flackern mehr, flüssiger, auch ohne Grafikkarte.",
+        "Filme und Serien spielt der Player von kinolel.de ab – mit Vorschaubildern beim Spulen, Intro überspringen und nächster Folge.",
+        "Beim Öffnen bleibt das KinoLel-Startbild, bis die Startseite fertig ist."
+      ],
+      "hu": [
+        "A KinoLel Windowsra új alapokra került: a háttérben most a Chrome (Chromium) fut – ugyanaz a technika, mint a böngészőben. Nincs több villogás, gördülékenyebb, grafikus kártya nélkül is.",
+        "A filmeket és sorozatokat a kinolel.de lejátszója játssza le – előnézeti képekkel tekeréskor, intró átugrásával és a következő epizóddal.",
+        "Megnyitáskor a KinoLel indítóképe addig látszik, amíg a kezdőlap el nem készül."
+      ],
+      "en": [
+        "KinoLel for Windows has been rebuilt: it now runs on Chrome (Chromium) – the same technology as the browser. No more flickering, smoother, even without a graphics card.",
+        "Movies and series play in the kinolel.de player – with preview images while seeking, intro skipping and the next episode.",
+        "When opening, the KinoLel start screen stays until the home screen is ready."
+      ]
+    }
+  ]
+}

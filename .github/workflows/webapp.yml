@@ -1,0 +1,98 @@
+# KinoLel für Windows als Web-App (Lel 25.10.2026: „… eine web app … basiere unseres bitte auf Chrome“):
+# Electron-Hülle um https://kinolel.de bauen (webapp/), Installer (Inno Setup, gleiche AppId wie die bisherige App),
+# Portable-ZIP, Test auf einem Windows-Runner ohne GPU (webapp/test/webapp_test.py: Umstieg von v0.1.6, Startseite,
+# Abspielen, TV-Modus, Auto-Update). Tag v* = Vorab-Version unter „Releases“ (apps.json übernimmt sie per Host-Cron).
+name: webapp
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - webapp
+      - main
+    tags:
+      - "v*"
+    paths-ignore:
+      - "**.md"
+      - webapp/test/pruefung_webapp.py
+      - .github/workflows/webapp-pruefung.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Bauen und testen (Windows ohne GPU)
+    runs-on: windows-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Version
+        run: |
+          $v = (Get-Content webapp/package.json -Raw | ConvertFrom-Json).version
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "KinoLel $v"
+
+      - name: App paketieren (Electron)
+        working-directory: webapp
+        run: |
+          Copy-Item ../bundle/win/app.ico app.ico
+          npm install --no-audit --no-fund
+          npm run paket
+          # nur Deutsch, Ungarisch, Englisch (spart ~40 MB)
+          Get-ChildItem dist/KinoLel-win32-x64/locales -File | Where-Object { $_.Name -notin @('de.pak','hu.pak','en-US.pak') } | Remove-Item
+          Get-ChildItem dist/KinoLel-win32-x64 | Format-Table Name, Length | Out-String | Write-Host
+
+      - name: Installer (Inno Setup) und Portable-ZIP
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          Copy-Item bundle/win/app.ico, bundle/win/wizard-image.png, bundle/win/wizard-small-image.png webapp/installer/
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DVersion=$env:VERSION" "/DQuelle=$pwd\webapp\dist\KinoLel-win32-x64" "/DAusgabe=$pwd\build" webapp/installer/KinoLel.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Compress-Archive -Path webapp/dist/KinoLel-win32-x64/* -DestinationPath "build/KinoLel-Portable-$env:VERSION-x64.zip"
+          Get-ChildItem build | Format-Table Name, Length | Out-String | Write-Host
+
+      - name: Installer hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: kinolel-windows
+          path: build/
+          retention-days: 3
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Test-Werkzeuge
+        run: python -m pip install --quiet psutil websocket-client imageio-ffmpeg
+
+      - name: Test (Umstieg v0.1.6, Startseite, Abspielen, TV-Modus, Auto-Update)
+        env:
+          KINOLEL_TEST_PW: ${{ secrets.KINOLEL_TEST_PW }}
+          BEOBACHTUNG: "45"
+        run: python webapp/test/webapp_test.py "build/KinoLel-Setup-$env:VERSION-x64.exe" webtest
+
+      - name: Testergebnis hochladen
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: webtest
+          path: webtest/
+          retention-days: 3
+          if-no-files-found: ignore
+
+      - name: Vorab-Version veröffentlichen (nur bei Tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $dateien = @(Get-ChildItem build -File | Where-Object { $_.Name -match '-Setup-.*\.exe$|-Portable-.*\.zip$' } | ForEach-Object { $_.FullName })
+          gh release create "${{ github.ref_name }}" $dateien --prerelease --title "Testversion ${{ github.ref_name }}" --notes-file TESTANLEITUNG.md

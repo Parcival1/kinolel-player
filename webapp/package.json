@@ -3,9 +3,16 @@
   "productName": "KinoLel",
   "version": "0.3.0",
   "private": true,
-  "description": "KinoLel für Windows – Hülle um https://kinolel.de mit eigenem Chromium (Electron)",
+  "description": "KinoLel – Filme und Serien von KinoLel",
+  "author": "Lel",
+  "license": "GPL-2.0",
   "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "paket": "electron-packager . KinoLel --platform=win32 --arch=x64 --out=dist --overwrite --asar --icon=app.ico --app-copyright=Lel --win32metadata.CompanyName=Lel --win32metadata.FileDescription=KinoLel --win32metadata.ProductName=KinoLel --win32metadata.InternalName=KinoLel --win32metadata.OriginalFilename=KinoLel.exe --ignore=^/dist --ignore=^/test --ignore=^/installer --ignore=^/node_modules/.bin"
+  },
   "devDependencies": {
+    "@electron/packager": "^20.3.0",
     "electron": "45.0.0"
   }
 }
