@@ -30,7 +30,12 @@ jobs:
 
       - name: Electron holen
         working-directory: webapp
-        run: npm install --no-audit --no-fund
+        run: |
+          npm install --no-audit --no-fund
+          if (-not (Test-Path node_modules/electron/dist/electron.exe)) { node node_modules/electron/install.js }
+          $exe = node -p "require('electron')"
+          Write-Host "Electron: $exe"; Get-ChildItem node_modules/electron/dist | Select-Object -First 5 | Out-String | Write-Host
+          "ELECTRON_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Python-Werkzeuge
         run: pip install --quiet websocket-client psutil pillow
@@ -38,7 +43,7 @@ jobs:
       - name: Prüfung
         env:
           KINOLEL_TEST_PW: ${{ secrets.KINOLEL_TEST_PW }}
-        run: python webapp/test/pruefung_webapp.py webapp/node_modules/electron/dist/electron.exe webapp pruefung
+        run: python webapp/test/pruefung_webapp.py "$env:ELECTRON_EXE" webapp pruefung
 
       - name: Ergebnis hochladen
         if: always()
