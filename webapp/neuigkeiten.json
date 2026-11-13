@@ -1,6 +1,18 @@
 {
   "versionen": [
     {
+      "version": "1.1",
+      "de": [
+        "Filme und Serien in HDR sind auf Bildschirmen ohne HDR nicht mehr zu dunkel."
+      ],
+      "hu": [
+        "A HDR-es filmek és sorozatok HDR nélküli képernyőn már nem túl sötétek."
+      ],
+      "en": [
+        "Movies and shows in HDR are no longer too dark on screens without HDR."
+      ]
+    },
+    {
       "version": "1.0",
       "de": [
         "KinoLel für Windows ist jetzt Version 1.0.",

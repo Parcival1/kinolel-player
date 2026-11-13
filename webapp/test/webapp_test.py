@@ -8,7 +8,7 @@ Reihenfolge (nur EINE Anmeldung je Lauf, fail2ban: > 6 Fehler in 10 Min. = Sperr
     Name „KinoLel“ (Prozess, Fenster, kein „Electron“), eine Installation, Startmenü-Einträge
  3. Grafik-Info (Strg+Umschalt+G)
  4. Startseite beobachten (startseite.py: Flackern im Bildschirmvideo, Anfragen/DOM, CPU) – ohne neue Anmeldung
- 5. Abspielen eines Testfilms (Start, Vorschaubild beim Spulen, Tonspur wechseln, Fortschritt beim Server)
+ 5. Abspielen eines Testfilms (Start, Vorschaubild beim Spulen, Tonspur wechseln, Fortschritt beim Server, HDR-Schutz: ohne HDR-Bildschirm nur SDR im Profil)
  6. TV-Modus (Vollbild, TV-Oberfläche)
  7. Auto-Update: Versionsliste mit höherer Version (lokal) -> Hinweis -> „Jetzt aktualisieren“ -> Setup läuft still,
     KinoLel startet wieder
@@ -461,13 +461,41 @@ def startseite_beobachten():
     beenden(sanft=True)
 
 
+def hdr_pruefen(cdp, abspielinfo):
+    """HDR-Schutz (seite-preload.js): ohne HDR-Bildschirm darf das Abspielprofil nur SDR erlauben, sonst rechnet Chromium
+    HDR selbst (viel zu dunkel) um – der Runner hat keinen HDR-Bildschirm."""
+    bildschirm = cdp.js("window.kinolelHdr ? window.kinolelHdr.bildschirm() : 'fehlt'")
+    probe = cdp.js("window.kinolelHdr ? JSON.parse(window.kinolelHdr.anpassen(JSON.stringify({DeviceProfile:{CodecProfiles:[{Type:'Video',"
+                   "Codec:'hevc',Conditions:[{Condition:'EqualsAny',Property:'VideoRangeType',Value:'SDR|HDR10|HDR10Plus|HLG',IsRequired:false}]}]}})))"
+                   ".DeviceProfile.CodecProfiles[0].Conditions[0].Value : null")
+    merke('HDR: Bildschirm ohne HDR erkannt, Profil-Anpassung streicht HDR', bildschirm is False and probe == 'SDR', f'HDR-Bildschirm={bildschirm}, Probe={probe}')
+    werte = set()
+    for p in abspielinfo:
+        text = p.get('request', {}).get('postData')
+        if not text and p.get('requestId'):
+            text = cdp.rufe('Network.getRequestPostData', requestId=p['requestId']).get('postData')
+        try:
+            profil = json.loads(text or '{}').get('DeviceProfile') or {}
+        except ValueError:
+            continue
+        for cp in profil.get('CodecProfiles') or []:
+            for c in cp.get('Conditions') or []:
+                if c.get('Property') == 'VideoRangeType':
+                    werte.update(str(c.get('Value', '')).split('|'))
+    merke('HDR: echte Abspiel-Anfrage erlaubt nur SDR', bool(abspielinfo) and bool(werte) and werte <= {'SDR', 'DOVIWithSDR'},
+          f'{len(abspielinfo)} Anfrage(n), VideoRangeType: {"|".join(sorted(werte)) or "-"}')
+
+
 def abspielen():
-    """5. Testfilm abspielen: Start, Vorschaubild beim Spulen, Tonspur wechseln, Fortschritt beim Server"""
+    """5. Testfilm abspielen: Start, Vorschaubild beim Spulen, Tonspur wechseln, Fortschritt beim Server, HDR-Schutz"""
     proc, cdp = app_starten()
     if not merke('App für den Abspieltest', cdp):
         return
     anfragen = []
     cdp.ereignis_rueckrufe.append(lambda m, p: anfragen.append(p.get('request', {}).get('url', '')) if m == 'Network.requestWillBeSent' else None)
+    abspielinfo = []   # HDR-Schutz (Lel 13.11.2026): Geräteprofil der echten PlaybackInfo-Anfrage mitlesen
+    cdp.ereignis_rueckrufe.append(lambda m, p: abspielinfo.append(p) if m == 'Network.requestWillBeSent' and '/PlaybackInfo' in p.get('request', {}).get('url', '')
+                                  and p.get('request', {}).get('method') == 'POST' else None)
     for d in ('Runtime.enable', 'Page.enable', 'Network.enable'):
         cdp.rufe(d)
     warten(cdp, STARTSEITE_BEREIT, time.time() + 60)
@@ -484,6 +512,7 @@ def abspielen():
                      "return {methode:p.PlayMethod,ton:p.AudioStreamIndex,pos:p.PositionTicks}})", zeit=20) or {}
     bild(cdp, '05-abspielen')
     merke('Abspielen: Film läuft im eingebauten Player', laeuft, f"{zustand.get('methode')}")
+    hdr_pruefen(cdp, abspielinfo)
     if not laeuft:
         return
     # Vorschaubild beim Spulen: Maus über die Zeitleiste
